@@ -80,6 +80,9 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
              {"term": {"texto": "estetico"}}]}},
   "highlight": {  "fields": {   "texto": {}   }}} 
  ```
+ - Retornando algo como:
+   - <i>"texto" : [</i> "trata-se de entendimento do `dano` `moral` e `estético`. .<i>",
+                 "</i> Eu proporia 20 salários mínimos como `dano` `moral`, trazendo a reflexão sobre o `dano` `estético` . .<i>",]</i>
  
 ## Exemplos de simplificações/transformações (estão nos testes do componente)
  - `dano Adj moRal` ==> `dano ADJ1 moRal`
