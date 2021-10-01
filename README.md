@@ -35,11 +35,41 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
      - `termo1 PROX10 termo2 PROX3 termo3` --> `termo1 PROX10 termo2 PROX10 termo3`
    - Operadores especiais (PROX, ADJ) diferentes em sequência, quebra em dois grupos e duplica o termo entre os grupos:
      - `termo1 PROX10 termo2 ADJ5 termo3` --> `termo1 PROX10 termo2 E termo2 ADJ5 termo3`
+   - Operadores ou termos soltos entre parênteses, remove os parênteses: 
+     - `termo1 (ADJ1) termo2` --> `termo1 ADJ1 termo2` 
+     - `(termo1) ADJ1 (termo2)` --> `termo1 ADJ1 termo2` 
  
 ## Query:
  - A query será construída por grupos convertidos dos critérios BRS para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
 
+## Exemplo de queries transformadas:
+ - Escrito pelo usuário: `dano prox5 moral dano prox20 material estetico`
+ - Ajustado pela classe: `(dano PROX5 moral) E (dano PROX20 material) E estetico`
+ - Query do Elastic criada: 
+ ```json
+ {"query": {"bool": 
+    {"must": [{"span_near": 
+                   {"clauses": [{"span_term": {"texto": "dano"}}, 
+                                {"span_term": {"texto": "moral"}}], "slop": 4, "in_order": false}}, 
+              {"span_near": 
+                   {"clauses": [{"span_term": {"texto": "dano"}}, 
+                                {"span_term": {"texto": "material"}}], "slop": 19, "in_order": false}}, 
+              {"term": {"texto": "estetico"}}]}}}
+ ```
+  - Ou você pode omitir os campos e retornar os trechos do texto grifados com os termos encontrados
+ ```json
+{"_source": [""], "query": {"bool": 
+   {"must": [{"span_near": 
+                  {"clauses": [{"span_term": {"texto": "dano"}}, 
+                               {"span_term": {"texto": "moral"}}], "slop": 4, "in_order": false}}, 
+             {"span_near": 
+                  {"clauses": [{"span_term": {"texto": "dano"}}, 
+                               {"span_term": {"texto": "material"}}], "slop": 19, "in_order": false}}, 
+             {"term": {"texto": "estetico"}}]}},
+  "highlight": {  "fields": {   "texto": {}   }}} 
+ ```
+ 
 ## Exemplos de simplificações/transformações (estão nos testes do componente)
  - `'dano Adj moRal'` ==> `'dano ADJ1 moRal'`
  - `'"dano moral'` ==> `'"dano" ADJ1 "moral"')`
