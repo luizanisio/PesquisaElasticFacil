@@ -3,7 +3,9 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
 
 Componente python que aproxima o uso dos operadores do BRS em queries internas do ElasticSearch não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios usados no BRS (`PROX`, `ADJ`, `COM`) e converter para os critérios do elastic.
 
-`FINALIZANDO TESTES antes de disponibilizar`
+- `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente `Doc2VecFacil` para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
+
+- `FINALIZANDO TESTES antes de disponibilizar`
 
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
