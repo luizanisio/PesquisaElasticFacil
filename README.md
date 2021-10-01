@@ -1,10 +1,21 @@
 # PesquisaElasticFacil
 
-Componente python que aproxima o uso dos operadores comuns no BRS em queries internas do ElasticSearch. Não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios do elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
+Componente python que simplifica a construção de queries no ElasticSearch e aproxima o uso dos operadores de proximidade comuns no BRS em queries internas do ElasticSearch. Não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios do elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
 - `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente `Doc2VecFacil` para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
 
 - `FINALIZANDO TESTES antes de disponibilizar`
+
+## Operadores:
+<ul>
+  <li> <b>E</b>: conector padrão, exige a existência do termo no documento</li>
+  <li> <b>NÃO</b>: nega a existência de um termo no documento </li>
+  <li> <b>OU</b> entre termos: indica que um ou outro termo podem ser encontrados para satisfazer a pesquisa</li>
+  <li> <b>OU</b> com parênteses: permite realizar pesquisas mais complexas onde um ou outro grupo são aceitos.</li>
+  <li> <b>ADJ</b>n: permite localizar termos que estejam até n termos a frente do primeiro termo.</li>
+  <li> <b>PROX</b>n: semelhante ao <b>ADJ</b>, mas localiza termos posteriores ou anteriores ao primeiro termo pesquisado.</li>
+  <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por PROX20.</li>
+</ul>
 
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
