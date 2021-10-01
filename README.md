@@ -57,7 +57,7 @@ Componente python que aproxima o uso dos operadores comuns no BRS em queries int
      - `(termo1) ADJ1 (termo2)` --> `termo1 ADJ1 termo2` 
  
 ## Query:
- - A query será construída por grupos convertidos dos critérios BRS para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
+ - A query será construída por grupos convertidos dos critérios `PROX` e `ADJ` para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
 
 ## Exemplo de queries transformadas:
