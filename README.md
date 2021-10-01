@@ -13,11 +13,11 @@ Componente python que aproxima o uso dos operadores comuns no BRS em queries int
  - o `NÃO` anter de um termo afeta apenas o termo por ele seguido
  - o `NÃO` antes de um grupo afeta todo o grupo
  - se nos critérios tiver `ADJ` e depois `PROX` ou vice-versa, os termos entre eles serão duplicados para cada grupo ex.: `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 prox10 termo2) E (termo2 ADJ3 termo3)`
- - o elastic trabalha com proximidade (SLOP) sequencial (como o ADJ) ou não sequencial (como o PROX) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado
+ - o elastic trabalha com proximidade (SLOP) sequencial (como o ADJ) ou não sequencial (como o PROX) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado.
  
-## Dessa forma, serão criados grupos de termos por operadores
- - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 prox10 termo2) E (termo2 ADJ3 termo3)`
- - `termo1 prox5 termo2 prox10 termo3` ==> `(termo1 prox10 termo2 prox10 termo3)`
+### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
+ - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)`
+ - `termo1 prox5 termo2 prox10 termo3` ==> `(termo1 PROX10 termo2 PROX10 termo3)`
 
 ## Curingas:
  - O elastic trabalha com wildcards ou regex mas possui uma limitação de termos retornados pelos curingas
