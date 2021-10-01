@@ -31,6 +31,11 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  - contornando o erro:
    - deve-se controlar esse erro e sugerir ao usuário substituir <b>*<b> por <b>??<b> ou reduzir o número de <b>??<b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
 
+## Aspas:
+ - Os termos entre aspas serão pesquisados da forma que estiverem escritos. 
+ - Um grupo de termos entre aspas será tratado como distância 1, ou seja `ADJ1` (`SLOP 0` no Elastic).
+   - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
+
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
    - Operadores seguidos, mantém o último: 
@@ -77,27 +82,27 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  ```
  
 ## Exemplos de simplificações/transformações (estão nos testes do componente)
- - `'dano Adj moRal'` ==> `'dano ADJ1 moRal'`
- - `'"dano moral'` ==> `'"dano" ADJ1 "moral"')`
- - `'"dano" prox10 "moral"'` ==> `'"dano" PROX10 "moral"')`
- - `'termo1 E termo2 termo3 OU termo4'` ==> `'termo1 E termo2 E (termo3 OU termo4)')`
- - `'termo1 E termo2 termo3 NÃO termo4'` ==> `'termo1 E termo2 E termo3 NAO termo4')`
- - `'termo1 E termo2 termo3 NÃO termo4 ou termo5'` ==> `'termo1 E termo2 E termo3 NAO (termo4 OU termo5)')`
- - `'dano moral e material'` ==> `'dano E moral E material')`
- - `'dano prox5 material e estético'` ==> `'(dano PROX5 material) E estético')`
- - `'dano prox5 material estético'` ==> `'(dano PROX5 material) E estético')`
- - `'estético dano prox5 material'` ==> `'estético E (dano PROX5 material)')`
- - `'estético e dano prox5 material'` ==> `'estético E (dano PROX5 material)')`
- - `'dano moral (dano prox5 "material e estético)'` ==> `'dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estético"))')`
- - `(dano moral) prova (agravo (dano prox5 "material e estético))' ` ==> `'(dano E moral) E prova E (agravo E (dano ("material" ADJ1 "e" ADJ1 "estético")))')`
- - `'teste1 adj2 teste2 prox3 teste3 teste4' ` ==> `'(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4')`
- - `'termo1 E termo2 OU termo3 OU termo4' ` ==> `'termo1 E (termo2 OU termo3 OU termo4)')`
- - `'termo1 E termo2 OU (termo3 adj2 termo4)' ` ==> `'termo1 E (termo2 OU (termo3 ADJ2 termo4))')`
- - `'termo1 OU termo2 termo3' ` ==> `'(termo1 OU termo2) E termo3')`
- - `'termo1 OU termo2 (termo3 termo4)' ` ==> `'(termo1 OU termo2) E (termo3 E termo4)')`
- - `'termo1 OU termo2 termo3 OU termo4' ` ==> `'(termo1 OU termo2) E (termo3 OU termo4)')`
- - `'termo1 OU termo2 (termo3 OU termo4 termo5)' ` ==> `'(termo1 OU termo2) E ((termo3 OU termo4) E termo5)')`
- - `'termo1 OU termo2 OU (termo3 OU termo4 termo5)' ` ==> `'termo1 OU termo2 OU ((termo3 OU termo4) E termo5)')`
- - `('dano adj2 mora* dano prox10 moral prox5 material que?ra' ` ==> `'(dano ADJ2 mora*) E (dano PROX10 moral PROX5 material)  que?ra')`
- - `'termo1 OU termo2 nao termo3' ` ==> `'(termo1 OU termo2) NAO termo3')`
- - `'termo1 OU termo2 nao (termo3 Ou termo4)' ` ==> `'(termo1 OU termo2) NAO (termo3 OU termo4)'`
+ - `dano Adj moRal` ==> `dano ADJ1 moRal`
+ - `"dano moral` ==> `"dano" ADJ1 "moral"`
+ - `"dano" prox10 "moral"` ==> `"dano" PROX10 "moral"`
+ - `termo1 E termo2 termo3 OU termo4` ==> `termo1 E termo2 E (termo3 OU termo4)`
+ - `termo1 E termo2 termo3 NÃO termo4` ==> `termo1 E termo2 E termo3 NAO termo4`
+ - `termo1 E termo2 termo3 NÃO termo4 ou termo5` ==> `termo1 E termo2 E termo3 NAO (termo4 OU termo5)`
+ - `dano moral e material` ==> `dano E moral E material`
+ - `dano prox5 material e estético` ==> `(dano PROX5 material) E estético`
+ - `dano prox5 material estético` ==> `(dano PROX5 material) E estético`
+ - `estético dano prox5 material` ==> `estético E (dano PROX5 material)`
+ - `estético e dano prox5 material` ==> `estético E (dano PROX5 material)`
+ - `dano moral (dano prox5 "material e estético)` ==> `dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estético"))`
+ - `(dano moral) prova (agravo (dano prox5 "material e estético)) ` ==> `(dano E moral) E prova E (agravo E (dano ("material" ADJ1 "e" ADJ1 "estético")))`
+ - `teste1 adj2 teste2 prox3 teste3 teste4 ` ==> `(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4`
+ - `termo1 E termo2 OU termo3 OU termo4 ` ==> `termo1 E (termo2 OU termo3 OU termo4)`
+ - `termo1 E termo2 OU (termo3 adj2 termo4) ` ==> `termo1 E (termo2 OU (termo3 ADJ2 termo4))`
+ - `termo1 OU termo2 termo3 ` ==> `(termo1 OU termo2) E termo3`
+ - `termo1 OU termo2 (termo3 termo4) ` ==> `(termo1 OU termo2) E (termo3 E termo4)`
+ - `termo1 OU termo2 termo3 OU termo4 ` ==> `(termo1 OU termo2) E (termo3 OU termo4)`
+ - `termo1 OU termo2 (termo3 OU termo4 termo5) ` ==> `(termo1 OU termo2) E ((termo3 OU termo4) E termo5)`
+ - `termo1 OU termo2 OU (termo3 OU termo4 termo5) ` ==> `termo1 OU termo2 OU ((termo3 OU termo4) E termo5)`
+ - `(dano adj2 mora* dano prox10 moral prox5 material que?ra ` ==> `(dano ADJ2 mora*) E (dano PROX10 moral PROX5 material)  que?ra`
+ - `termo1 OU termo2 nao termo3 ` ==> `(termo1 OU termo2) NAO termo3`
+ - `termo1 OU termo2 nao (termo3 Ou termo4) ` ==> `(termo1 OU termo2) NAO (termo3 OU termo4)`
