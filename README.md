@@ -1,7 +1,6 @@
-# PesquisaElasticBRS
-Componente python que aproxima o uso dos operadores do BRS em queries internas do ElasticSearch 
+# PesquisaElasticFacil
 
-Componente python que aproxima o uso dos operadores do BRS em queries internas do ElasticSearch não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios usados no BRS (`PROX`, `ADJ`, `COM`) e converter para os critérios do elastic.
+Componente python que aproxima o uso dos operadores comuns no BRS em queries internas do ElasticSearch. Não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios do elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
 - `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente `Doc2VecFacil` para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
 
@@ -38,6 +37,11 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  - Um grupo de termos entre aspas será tratado como distância 1, ou seja `ADJ1` (`SLOP 0` no Elastic).
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
 
+## Pesquisa "inteligente": 
+ - A ideia é permitir o usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante em a necessidade de uso operadores.
+ - O texto fornecido pelo usuário é incorporado a uma query `More like this` do elastic ou o usuário pode solicitar que textos mais semelhantes sejam retornados, usando internamente o critério `SLOP n` com os termos informados. 
+ - São opções que tornam o uso simples e intuitivo mas entregam pesquisas robustas disponíveis no ElasticSearch
+ 
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
    - Operadores seguidos, mantém o último: 
