@@ -30,7 +30,11 @@ Componente python que aproxima o uso dos operadores comuns no BRS em queries int
  - Exemplo de erro causado com um curinga no termo `dan????`. Uma sugestão seria usar menos curingas como `dan??`.
  - ERRO: `"caused_by" : {"type" : "runtime_exception","reason" : "[texto:/dan.{0,4}o/ ] exceeds maxClauseCount [ Boolean maxClauseCount is set to 1024]"}`
  - contornando o erro:
-   - deve-se controlar esse erro e sugerir ao usuário substituir <b>*<b> por <b>??<b> ou reduzir o número de <b>??<b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
+   - deve-se controlar esse erro e sugerir ao usuário substituir <b>*</b> por um conjunto de <b>?</b>, ou reduzir o número de <b>?</b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
+ - Exemplos de conversões de curingas para o ElasticSearch:
+   - `estetic??` --> `{"regexp": {"texto": {"case_insensitive": true, "value": "estetic.{0,2}"}}}]}}`
+   - `??ativ?` --> `{"regexp": {"texto": {"case_insensitive": true, "value": ".{0,2}ativ.{0,1}"}}}]}}`
+   - `mora*` ou `mora$` --> `{"wildcard": {"texto": {"case_insensitive": true, "value": "mora*"}}}`
 
 ## Aspas:
  - Os termos entre aspas serão pesquisados da forma que estiverem escritos. 
