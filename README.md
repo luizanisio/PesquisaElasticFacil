@@ -25,6 +25,17 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  - contornando o erro:
    - deve-se controlar esse erro e sugerir ao usuário substituir <b>*<b> por <b>??<b> ou reduzir o número de <b>??<b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
 
+## Correções automáticas 
+ - Alguns erros de construção das queries serão corrigidos automaticamente
+   - Operadores seguidos, mantém o último: 
+     - `termo1 OU E ADJ1 PROX10 termo2` --> `termo1 PROX10 termo2`
+   - Operadores especiais (PROX, ADJ) antes ou depois de parênteses, converte para E:
+     - `termo1 PROX10 (termo2 termo3)` --> `termo1 E (termo2 E termo3)`
+   - Operadores especiais (PROX, ADJ) iguais com diferentes distâncias, usa a maior distância:
+     - `termo1 PROX10 termo2 PROX3 termo3` --> `termo1 PROX10 termo2 PROX10 termo3`
+   - Operadores especiais (PROX, ADJ) diferentes em sequência, quebra em dois grupos e duplica o termo entre os grupos:
+     - `termo1 PROX10 termo2 ADJ5 termo3` --> `termo1 PROX10 termo2 E termo2 ADJ5 termo3`
+ 
 ## Query:
  - A query será construída por grupos convertidos dos critérios BRS para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
@@ -42,8 +53,8 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  - `'estético dano prox5 material'` ==> `'estético E (dano PROX5 material)')`
  - `'estético e dano prox5 material'` ==> `'estético E (dano PROX5 material)')`
  - `'dano moral (dano prox5 "material e estético)'` ==> `'dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estético"))')`
- - `(dano moral) prova (agravo (dano prox5 "material e estético))' ` ==> `'(dano E moral) E prova E (agravo E (dano ` ("material" ADJ1 "e" ADJ1 "estético")))'),
- -` 'teste1 adj2 teste2 prox3 teste3 teste4' ` ==> `'(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4')`
+ - `(dano moral) prova (agravo (dano prox5 "material e estético))' ` ==> `'(dano E moral) E prova E (agravo E (dano ("material" ADJ1 "e" ADJ1 "estético")))')`
+ - `'teste1 adj2 teste2 prox3 teste3 teste4' ` ==> `'(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4')`
  - `'termo1 E termo2 OU termo3 OU termo4' ` ==> `'termo1 E (termo2 OU termo3 OU termo4)')`
  - `'termo1 E termo2 OU (termo3 adj2 termo4)' ` ==> `'termo1 E (termo2 OU (termo3 ADJ2 termo4))')`
  - `'termo1 OU termo2 termo3' ` ==> `'(termo1 OU termo2) E termo3')`
