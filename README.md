@@ -3,6 +3,8 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
 
 Componente python que aproxima o uso dos operadores do BRS em queries internas do ElasticSearch não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios usados no BRS (`PROX`, `ADJ`, `COM`) e converter para os critérios do elastic.
 
+`FINALIZANDO TESTES antes de dispoinibilizar`
+
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
  - como operadores diferentes não podem ser agrupados, não é possível usar PROX ou ADJ antes ou depois de parênteses
