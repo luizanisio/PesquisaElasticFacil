@@ -21,7 +21,13 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
 ## Curingas:
  - O elastic trabalha com wildcards ou regex mas possui uma limitação de termos retornados pelos curingas
    pois ele cria um conjunto interno de subqueries retornando erro se esse conjunto for muito grande
- - ERRO: `"caused_by" : {"type" : "runtime_exception","reason" : "[texto:/dan.{0,4}o/ ] exceeds maxClauseCount [ Boolean maxClauseCount is set to 1024]"`
+ - São aceitos os curingas em qualquer posição do termo:
+   - `*` ou `$` para qualquer quantidade de caracteres: `dano?` pode retornar `dano`, `danos`, `danosos`, etc.
+   - `?` para 0 ou um caracteres: `dano?` pode retornar `dano` ou `danos`.
+   - `?` para 0 ou um caracteres: `??ativo` pode retornar `ativo`, `inativo`, `reativo`, etc.
+   - `??` para 0 caracteres ou quandos `?` forem colocados: `dan??` pode retornar `dano`,`danos`,`dani`,`danas`,`dan`, etc.
+ - Exemplo de erro causado com um curinga no termo `dan????`. Uma sugestão seria usar menos curingas como `dan??`.
+ - ERRO: `"caused_by" : {"type" : "runtime_exception","reason" : "[texto:/dan.{0,4}o/ ] exceeds maxClauseCount [ Boolean maxClauseCount is set to 1024]"}`
  - contornando o erro:
    - deve-se controlar esse erro e sugerir ao usuário substituir <b>*<b> por <b>??<b> ou reduzir o número de <b>??<b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
 
@@ -44,8 +50,8 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
 
 ## Exemplo de queries transformadas:
- - Escrito pelo usuário: `dano prox5 moral dano prox20 material estetico`
- - Ajustado pela classe: `(dano PROX5 moral) E (dano PROX20 material) E estetico`
+ - Escrito pelo usuário: `dano prox5 moral dano adj20 material estetico`
+ - Ajustado pela classe: `(dano PROX5 moral) E (dano ADJ20 material) E estetico`
  - Query do Elastic criada: 
  ```json
  {"query": {"bool": 
@@ -54,7 +60,7 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
                                 {"span_term": {"texto": "moral"}}], "slop": 4, "in_order": false}}, 
               {"span_near": 
                    {"clauses": [{"span_term": {"texto": "dano"}}, 
-                                {"span_term": {"texto": "material"}}], "slop": 19, "in_order": false}}, 
+                                {"span_term": {"texto": "material"}}], "slop": 19, "in_order": true}}, 
               {"term": {"texto": "estetico"}}]}}}
  ```
   - Ou você pode omitir os campos e retornar os trechos do texto grifados com os termos encontrados
@@ -65,7 +71,7 @@ Componente python que aproxima o uso dos operadores do BRS em queries internas d
                                {"span_term": {"texto": "moral"}}], "slop": 4, "in_order": false}}, 
              {"span_near": 
                   {"clauses": [{"span_term": {"texto": "dano"}}, 
-                               {"span_term": {"texto": "material"}}], "slop": 19, "in_order": false}}, 
+                               {"span_term": {"texto": "material"}}], "slop": 19, "in_order": true}}, 
              {"term": {"texto": "estetico"}}]}},
   "highlight": {  "fields": {   "texto": {}   }}} 
  ```
