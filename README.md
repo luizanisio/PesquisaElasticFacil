@@ -18,6 +18,8 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
   <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por `PROX30` até ser encontrada uma forma mais próxima de pesquisa.</li>
 </ul>
 
+Queries no Elastic que permitem a transformação dos operadores: [ElasticQueries](ElasticQueries.md) 
+
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
  - como operadores diferentes não podem ser agrupados, não é possível usar PROX ou ADJ antes ou depois de parênteses
@@ -79,7 +81,7 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
 ## Exemplo de queries transformadas:
  - Escrito pelo usuário: `dano prox5 moral dano adj20 material estetico`
  - Ajustado pela classe: `(dano PROX5 moral) E (dano ADJ20 material) E estetico`
- - Dicas de construção de queries no Elastic: [a relative link](ElasticQueries.md) 
+ - Dicas de construção de queries no Elastic: [ElasticQueries](ElasticQueries.md) 
  - Query do Elastic criada: 
  ```json
  {"query": {"bool": 
