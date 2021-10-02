@@ -24,22 +24,22 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
  - como operadores diferentes não podem ser agrupados, não é possível usar PROX ou ADJ antes ou depois de parênteses
  - operadores `PROX` e `ADJ` antes ou depois de parênteses serão transformados em `E`
- - o `NÃO` anter de um termo afeta apenas o termo por ele seguido
- - o `NÃO` antes de um grupo afeta todo o grupo
+ - o `NÃO` antes de um termo afeta apenas o termo por ele seguido: `"dano moral" não material`
+ - o `NÃO` antes de um grupo afeta todo o grupo: `"dano moral" não (material e prejuízo)`
  - se nos critérios tiver `ADJ` e depois `PROX` ou vice-versa, os termos entre eles serão duplicados para cada grupo ex.: `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 prox10 termo2) E (termo2 ADJ3 termo3)`
  - o elastic trabalha com proximidade (SLOP) sequencial (como o ADJ) ou não sequencial (como o PROX) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado.
  
 ### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
- - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)`
- - `termo1 prox5 termo2 prox10 termo3` ==> `(termo1 PROX10 termo2 PROX10 termo3)`
+ - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)` ==> dois grupos foram criados
+ - `termo1 prox5 termo2 prox10 termo3` ==> `(termo1 PROX10 termo2 PROX10 termo3)` ==> fica valendo o maior PROX
 
 ## Curingas:
  - O elastic trabalha com wildcards ou regex mas possui uma limitação de termos retornados pelos curingas
    pois ele cria um conjunto interno de subqueries retornando erro se esse conjunto for muito grande
  - São aceitos os curingas em qualquer posição do termo:
-   - `*` ou `$` para qualquer quantidade de caracteres: `dano?` pode retornar `dano`, `danos`, `danosos`, etc.
-   - `?` para 0 ou um caracteres: `dano?` pode retornar `dano` ou `danos`.
-   - `?` para 0 ou um caracteres: `??ativo` pode retornar `ativo`, `inativo`, `reativo`, etc.
+   - `*` ou `$` para qualquer quantidade de caracteres: `dano*` pode retornar `dano`, `danos`, `danosos`, etc.
+   - `?` para 0 ou um caracter: `dano?` pode retornar `dano` ou `danos`.
+   - `?` para 0, 1 ou 2 caracteres: `??ativo` pode retornar `ativo`, `inativo`, `reativo`, etc.
    - `??` para 0 caracteres ou quandos `?` forem colocados: `dan??` pode retornar `dano`,`danos`,`dani`,`danas`,`dan`, etc.
  - Exemplo de erro causado com um curinga no termo `dan????`. Uma sugestão seria usar menos curingas como `dan??`.
  - ERRO: `"caused_by" : {"type" : "runtime_exception","reason" : "[texto:/dan.{0,4}o/ ] exceeds maxClauseCount [ Boolean maxClauseCount is set to 1024]"}`
@@ -56,9 +56,9 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
 
 ## Pesquisa "inteligente": 
- - A ideia é permitir o usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante em a necessidade de uso operadores.
+ - A ideia é permitir o usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante sem a necessidade de uso operadores.
  - O texto fornecido pelo usuário é incorporado a uma query `More like this` do elastic ou o usuário pode solicitar que textos mais semelhantes sejam retornados, usando internamente o critério `SLOP n` com os termos informados. 
- - São opções que tornam o uso simples e intuitivo mas entregam pesquisas robustas disponíveis no ElasticSearch
+ - São opções que tornam o uso simples e intuitivo mas entregam pesquisas robustas disponíveis no ElasticSearch: estarão disponíveis no serviço de exemplo em breve.
  
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
@@ -74,7 +74,7 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
      - `termo1 (ADJ1) termo2` --> `termo1 ADJ1 termo2` 
      - `(termo1) ADJ1 (termo2)` --> `termo1 ADJ1 termo2` 
  
-## Query:
+## Query ElasticSearch:
  - A query será construída por grupos convertidos dos critérios `PROX` e `ADJ` para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
 
