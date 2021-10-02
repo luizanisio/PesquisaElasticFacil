@@ -15,7 +15,7 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
   <li> <b>OU</b> com parênteses: permite realizar pesquisas mais complexas onde um ou outro grupo são aceitos.</li>
   <li> <b>ADJ</b>n: permite localizar termos que estejam até n termos a frente do primeiro termo.</li>
   <li> <b>PROX</b>n: semelhante ao <b>ADJ</b>, mas localiza termos posteriores ou anteriores ao primeiro termo pesquisado.</li>
-  <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por PROX20 até ser encontrada uma forma mais próxima de pesquisa.</li>
+  <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por `PROX30` até ser encontrada uma forma mais próxima de pesquisa.</li>
 </ul>
 
 ## Regras:
