@@ -79,6 +79,7 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
 ## Exemplo de queries transformadas:
  - Escrito pelo usuário: `dano prox5 moral dano adj20 material estetico`
  - Ajustado pela classe: `(dano PROX5 moral) E (dano ADJ20 material) E estetico`
+ - Dicas de construção de queries no Elastic: https://github.com/luizanisio/PesquisaElasticFacil/blob/main/ElasticQueries.md
  - Query do Elastic criada: 
  ```json
  {"query": {"bool": 
