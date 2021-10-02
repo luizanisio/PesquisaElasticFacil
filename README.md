@@ -2,8 +2,8 @@
 
 Componente python que simplifica a construção de queries no ElasticSearch e aproxima o uso dos operadores de proximidade comuns no BRS em queries internas do ElasticSearch. Não há intenção de substituir ou competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios do elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
-- `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente `Doc2VecFacil` para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
-- https://github.com/luizanisio/Doc2VecFacil
+- `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente [Doc2VecFacil](https://github.com/luizanisio/Doc2VecFacil) para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
+
 
 - `FINALIZANDO TESTES antes de disponibilizar`
 
