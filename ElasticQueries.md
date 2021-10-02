@@ -1,4 +1,4 @@
-## Algumas queries de exemplo para pesquisas textuais e vetoriais. Essas estruturas são criadas automaticamente pela classe `PesquisaElasticFacil` como descrito no arquivo `README`.
+ Algumas queries de exemplo para pesquisas textuais e vetoriais. Essas estruturas são criadas automaticamente pela classe `PesquisaElasticFacil` como descrito no arquivo `README`.
 
 ### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (200 dimensões nesse exemplo):
 
@@ -34,7 +34,8 @@ PUT explorasim
     "dthr_acesso": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
     }
  }
-} ```
+} 
+```
 
 ### Exemplo de realização de uma pesquisa More Like This que busca documentos contendo os termos pesquisados analisando a importância de cada termo no corpus e nos documentos ao sugerir o score dos que possuem maior relação com o que foi pesquisado.
 - O interessante é que a pesquisa pode ser feita com termos soltos ou pode-se colocar um documento inteiro para buscar documentos similares com base na importância de cada termo apresentado.
@@ -76,4 +77,22 @@ GET /explorasim/_search
 ,
   "highlight": {"fields": {"texto": {}}
 }}
+```
+### Exemplo de pesquisa vetorial 
+- nesse caso o vetor treinado com o `Doc2VecFacil` ou qualquer outro modelo ou técnica de vetorização textual armazenado como array float no campo mapeado para esse tipo de pesquisa como no exemplo de mapeamento apresentado no início desa página.
+- Em `"params": {"query_vector: [] ..."` coloca-se o array float do vetor do documento em análise e a pesquisa vai retornar os documentos com maior similaridade vetoria.
+- A pesquisa pode ser combinada com `More like this`, `span_near` e qualquer outra formação de query do elastic, permitindo pesquisas robusas, mas cada vez mais complexas para um usuário comum construir.
+- Essa foi a motivação de um componente que permitisse transformar operadores simples de usar em pesquisas mais robustas e precisas que o ElasticSearch permite construir: [PesquisaElasticFacil](README.md) 
+```json
+{ "_source": ["titulo"],
+  "query": {
+      "script_score": {
+        "query": {"match_all": {}},
+        "script": {
+          "source": "cosineSimilarity(params.query_vector, 'vetor')+1",
+          "params": {"query_vector": [0.333, 0.5566, 0.222 ..... 0.544]}
+        }
+      }
+    }
+}
 ```
