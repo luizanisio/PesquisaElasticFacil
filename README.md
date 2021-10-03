@@ -8,7 +8,9 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
 from util_pesquisaelastic_facil.py import PesquisaElasticFacil
 teste = 'dano adj2 "moral" "dano" prox10 "moral" prox5 material mora*'
 pbe = PesquisaElasticFacil(teste)
-queryelastic = pbe.criterios_elastic_highlight
+# pbe.criterios_elastic_highlight  contém a query elastic com a chave highlight para trazer trechos grifados 
+# pbe.criterios_elastic contém a query elastic pura
+queryelastic = pbe.criterios_elastic_highlight 
 ```
 - Depois é só rodar a query no ElasticSearch
 
