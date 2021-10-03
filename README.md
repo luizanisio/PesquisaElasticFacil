@@ -5,8 +5,9 @@ Componente python que simplifica a construção de queries no ElasticSearch e ap
 - Código do componente: [PesquisaElasticFacil/python](util_pesquisaelastic_facil.py)
 - Uso do componente: 
 ```python
+from util_pesquisaelastic_facil.py import PesquisaElasticFacil
 teste = 'dano adj2 "moral" "dano" prox10 "moral" prox5 material mora*'
-pbe = PesquisaElasticFacil(teste,more_like_this=True)
+pbe = PesquisaElasticFacil(teste)
 queryelastic = pbe.criterios_elastic_highlight
 ```
 - Depois é só rodar a query no ElasticSearch
