@@ -11,6 +11,7 @@
 #   -> https://github.com/luizanisio/PesquisaElasticFacil/
 # Luiz Anísio 
 # Ver 0.1.0 - 03/10/2021 - disponibilizado no GitHub  
+# Ver 0.1.1 - 03/10/2021 - highlight no MLT
 #
 # TODO: 
 # - criar testes para queries do Elastic transformadas
@@ -262,7 +263,7 @@ class PesquisaElasticFacil():
         # critérios elastic pesquisa normal e highlight
         self.criterios_elastic = self.as_query()
         self.criterios_elastic_highlight = deepcopy(self.criterios_elastic)
-        self.criterios_elastic_highlight['highlight'] = {  "fields": {   f"{campo_texto}": {}   }}
+        self.criterios_elastic_highlight['highlight'] = {"type" : "plain", "fields": {   f"{campo_texto}": {}   }}
         self.criterios_elastic_highlight['_source'] = [""]
 
     @classmethod
