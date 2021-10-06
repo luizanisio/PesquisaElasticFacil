@@ -1,40 +1,52 @@
  Algumas queries de exemplo para pesquisas textuais e vetoriais. Essas estruturas são criadas automaticamente pela classe `PesquisaElasticFacil` como descrito no arquivo `README`.
 
 ### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (200 dimensões nesse exemplo):
-
+- o char_filter vai converter os símbolos `,` `.` `:` `/`  em `_` para facilitar a localização de números separados por símbolos diferentes no documento e na pesquisa.
+- o processamento do `PesquisaElasticFacil` vai fazer esse mesmo tratamento nos números informados nos critérios de pesquisa e substituir os símbolos por um regex `_?`, com isso a pesquisa vai encontrar números com a mesma estrutura com separadores diferentes. O processamento também inclui `_?` nos milhares caso o número não tenha separadores. Exemplo: `12345` vira `12_?345`.
 ```json
 PUT explorasim
-{"settings": {
-    "analysis": {
-        "analyzer": {
-            "simple_analyzer": {
-            "tokenizer": "uax_url_email",
-            "filter": [ "lowercase", "asciifolding" ]
-            },
-            "stemmed_analyzer": {
-            "tokenizer": "uax_url_email",
-            "filter": [ "lowercase", "asciifolding",
- "keyword_repeat", "brazilian_stem", "remove_duplicates" ]
-            }
-        }
-    }
-},
- "mappings": {
-    "properties": {
-    "pasta": {"type": "keyword"},
-    "arquivo": {"type": "keyword"},
-    "grupo": {"type": "keyword"},
-    "grupo_sim": {"type": "integer"},
-    "vetor": {"type": "dense_vector","dims": 200},
-    "texto": {"type" : "text",  "analyzer": "simple_analyzer", "term_vector": "with_positions_offsets_payloads",
-              "fields": {"stemmed":  { "type": "text", "analyzer": "stemmed_analyzer", "term_vector": "with_positions_offsets_payloads"}  }      
-             },
-    "dthr_vetor": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"},
-    "dthr_arquivo": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"},
-    "dthr_acesso": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
-    }
- }
-} 
+{
+	"settings": {
+		"analysis": {
+			"analyzer": {
+				"simple_analyzer": {
+					"tokenizer": "uax_url_email",
+					"char_filter": ["numeros"],
+					"filter": [
+						"lowercase",
+						"asciifolding"
+					]
+				},
+				"stemmed_analyzer": {
+					"tokenizer": "uax_url_email",
+					"char_filter": ["numeros"],
+					"filter": ["lowercase",	"asciifolding",	"keyword_repeat",	"brazilian_stem",	"remove_duplicates"	]
+				 }
+			},
+			"char_filter": {
+				"numeros": {
+					"type": "pattern_replace",
+					"pattern": "(\\d+)[\\.\\-\\/\\:](?=\\d)",
+					"replacement": "$1_"
+				}
+			}
+		}
+	},
+	"mappings": {
+		"properties": {
+			"pasta": {"type": "keyword"},
+			"arquivo": {"type": "keyword"},
+			"grupo": {"type": "keyword"},
+			"grupo_sim": {"type": "integer"},
+			"vetor": {"type": "dense_vector","dims": 300},
+			"texto": {"type": "text","analyzer": "simple_analyzer","term_vector": "with_positions_offsets",
+				         "fields": {	"stemmed": {"type": "text","analyzer": "stemmed_analyzer","term_vector": "with_positions_offsets"}}
+			         },
+			"dthr_vetor": {	"type": "date",	"format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
+			}
+		}
+	}
+}
 ```
 
 ### Exemplo de realização de uma pesquisa More Like This que busca documentos contendo os termos pesquisados analisando a importância de cada termo no corpus e nos documentos ao sugerir o score dos que possuem maior relação com o que foi pesquisado.
