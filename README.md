@@ -2,7 +2,7 @@
 
 Componente python que simplifica a construção de queries no ElasticSearch e permite o uso dos operadores de proximidade de termos, comuns no BRS, em queries internas do ElasticSearch. Não há intenção de competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios próximos no elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
-- Código do componente python: [PesquisaElasticFacil](util_pesquisaelastic_facil.py) `atualizado: 05/10/2021`
+- Código do componente python: [PesquisaElasticFacil](util_pesquisaelastic_facil.py) `atualizado: 06/10/2021`
 - Uso do componente: 
 ```python
 from util_pesquisaelastic_facil.py import PesquisaElasticFacil
@@ -14,7 +14,7 @@ queryelastic = pbe.criterios_elastic_highlight
 ```
 - Depois é só rodar a query no ElasticSearch
 
-- `EM BREVE`: Será disponibilizado um serviço exemplo em conjunto com o componente [Doc2VecFacil](https://github.com/luizanisio/Doc2VecFacil) para criação de modelos de similaridade textual, agregando valor às pesquisas do ElasticSearch de forma simples com um modelo treinado no corpus específico de cada projeto.
+- [`Serviço Exemplo`](servico_exemplo.md) : um exemplo simples de como o componente pode ser utilizado, os códigos serão disponibilizados em breve pois estou trabalhando na parte de envio de arquivos para indexação e vetorização.
 
 
 ## Operadores:
