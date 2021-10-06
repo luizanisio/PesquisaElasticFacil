@@ -4,22 +4,22 @@
 ### Telas de exemplo:
 
 #### Tela inicial com o espaço para digitação dos critérios de pesquisa
-![Tela inicial com critérios de pesquisa](../img/img001_tela_inicial.png?raw=true "Title")
+![Tela inicial com critérios de pesquisa](img001_tela_inicial.png?raw=true "Title")
 
 #### Painel com dicas de como usar pesquisas inteligentes
-![Painel com dicas dos operadores inteligentes](../img/img001_tela_dicas.png?raw=true "Title")
+![Painel com dicas dos operadores inteligentes](img001_tela_dicas.png?raw=true "Title")
 
 #### Menu com exemplos prontos para ilustrar o uso dos operadores
-![Menu com exemplos prontos](../img/img001_tela_lista_exemplos.png?raw=true "Title")
+![Menu com exemplos prontos](img001_tela_lista_exemplos.png?raw=true "Title")
 
 #### Painel explicando como os critérios ficaram após correções automáticas e como a query do ElasticSearch foi construída
 <i> > esse painel não precisa estar presente em uma tela de usuário final, mas facilita o debug e entendimento para os testes</i>
-![Painel explicando os critérios](../img/img001_tela_criterios_explicados.png?raw=true "Title")
+![Painel explicando os critérios](img001_tela_criterios_explicados.png?raw=true "Title")
 
 #### Painel com os resultados retornados pela pesquisa, o tempo e o total de documentos encontrados
 <i> > é um exemplo simples de como o resultado pode ser apresentado com trechos do documento onde os termos foram encontrados, o id do documento e o scrore de pesquisa</i><br>
 <i> > poderia ser incluído um link `buscar semelhantes` ao lado do `id` do documento, os semelhantes poderiam ser buscados pela similaridade vetorial combinada com critérios textuais e critérios de metadados escolhidos pelo usuário </i><br>
-![Painel com resultados](../img/img001_tela_criterios_resultados.png?raw=true "Title")
+![Painel com resultados](img001_tela_criterios_resultados.png?raw=true "Title")
 
 #### Painel para envio de arquivos para processamento
 <i> > `em construção` - permitirá que seja enviado um arquivo para ser indexado na base, vetorizado pelo modelo Doc2VecFacil para agrupamento e pesquisa vetorial.</i>
