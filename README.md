@@ -2,7 +2,7 @@
 
 Componente python que simplifica a construção de queries no ElasticSearch e permite o uso dos operadores de proximidade de termos, comuns no BRS, em queries internas do ElasticSearch. Não há intenção de competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios próximos no elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
-- Código do componente python: [PesquisaElasticFacil](util_pesquisaelastic_facil.py)
+- Código do componente python: [PesquisaElasticFacil](util_pesquisaelastic_facil.py) `atualizado: 05/10/2021`
 - Uso do componente: 
 ```python
 from util_pesquisaelastic_facil.py import PesquisaElasticFacil
@@ -66,9 +66,17 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
 
 ## Pesquisa "inteligente": 
- - A ideia é permitir o usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante sem a necessidade de uso operadores.
- - O texto fornecido pelo usuário é incorporado a uma query `More like this` do elastic ou o usuário pode solicitar que textos mais semelhantes sejam retornados, usando internamente o critério `SLOP n` com os termos informados. 
+ - A ideia é permitir ao usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante sem a necessidade de uso operadores.
+ - Tipos de pesquisas:
+   - `contém: termo1 termo2 termo3 ... termo999` : constrói uma query `More like this` do elastic que busca os documentos onde esses termos são mais relevantes
+   - `contém: termo1 termo2 termo3 ... termo999 NÃO (naotermo1 naotermo2 naotermo3 ... naotermo999)` : constrói uma query `More like this` do elastic que busca os documentos onde esses termos são mais relevantes e os termos do conjunto NÃO não são relevantes ou não estão no documento.
+   - `ADJn: termo1 termo2 termo3 ... termo999`: realiza uma pesquisa incluindo automaticamente o ADJn entre os termos.
+   - `PROXn: termo1 termo2 termo3 ... termo999`: realiza uma pesquisa incluindo automaticamente o PROXn entre os termos.
  - São opções que tornam o uso simples e intuitivo mas entregam pesquisas robustas disponíveis no ElasticSearch: estarão disponíveis no serviço de exemplo em breve.
+ - Exemplos:
+   - `ADJ2: aposentadoria pelo inss nao (professor professora invalidez)`
+   - `PROX10: aposentadoria inss complementar professor`
+   - `contém: aposentadoria inss pensao nao (complementar invalidez)`
  
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
