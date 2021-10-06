@@ -22,6 +22,7 @@
 #                        - pesquisas inteligentes:
 #                          - ADJn: lista de termos NÃO (lista de termos)
 #                          - PROXn: lista de termos NÃO (lista de termos)
+# Ver 0.1.3 - 06/10/2021 - correção termo único na pesquisa, correção de aspas simples e inclusão de mais testes
 #
 # TODO: 
 # - criar testes para queries do Elastic transformadas
@@ -79,7 +80,8 @@ TESTES_ENTRADA_FALHA = (
            ('dano e ou adj5 (adj5) prox5 e moRal','dano E moRal'),
            ('(termo1) ADJ1 (termo2)','termo1 ADJ1 termo2'),
            ('nao (termo1) nao ADJ1 (termo2)','NAO (termo1 ADJ1 termo2)'),
-           ('a123456,??  dano? prox5 mora? dano adj20 material estetic??','a123456 E (dano? PROX5 mora?) E (dano ADJ20 material) E estetic??')
+           ('a123456,??  dano? prox5 mora? dano adj20 material estetic??','a123456 E (dano? PROX5 mora?) E (dano ADJ20 material) E estetic??'),
+           ('2020','2020'),('(2020)','2020'),("'2020'",'"2020"'),
         )
 
 TESTES_CURINGAS = (
@@ -104,6 +106,10 @@ TESTES_OPERADORES = (
     ('ca??', 'ADJ2', 'span_multi', "('case_insensitive', true),('value', 'ca.{0,2}')"),
     ('ca?a*', 'E', 'regexp', "('case_insensitive', true),('value', 'ca.{0,1}a.*')"),
     ('?ca?a*', 'PROX10', 'span_multi', "('case_insensitive', true),('value', '.{0,1}ca.{0,1}a.*')"),
+    ('2020', 'E', 'regexp', "('case_insensitive', true),('value', '2_?020')"),
+    ('"/ano/"','E','wildcard',"('case_insensitive', true),('value', 'ano')"),
+    ("'/plano/'",'E','wildcard',"('case_insensitive', true),('value', 'plano')"),
+    ("/plana,",'E','term',"plana"),
 )
 
 
@@ -130,6 +136,7 @@ class Operadores():
     RE_TOKEN_INTERROGA = re.compile(r'([\?]+)')
     RE_TOKEN_ASTERISCO = re.compile(r'([\*\$]+)')
     RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"]') # o token já estará sem acentos
+    RE_LIMPAR_TERMO_ASPAS = re.compile(f'( \")|(\" )') # o token já estará sem acentos
     RE_LIMPAR_TERMO_MLT = re.compile(f'[^A-Za-z\d]') # tokens limpos de pesquisa
     OPERADOR_PADRAO = 'E'
     OPERADOR_ADJ1 = 'ADJ1'
@@ -248,10 +255,11 @@ class Operadores():
     @classmethod
     def formatar_termo(self, termo):
         # tratamento padrão
-        termo = Operadores.remover_acentos(termo)
+        termo = Operadores.remover_acentos(termo).replace("'",'"')
         if not self.RE_TERMO_NUMERICO.match(termo):
             #print('Limpando termo não numérico: ', termo)
             termo = Operadores.RE_LIMPAR_TERMO_NAO_NUMERICO.sub(' ', termo).strip()
+            termo = Operadores.RE_LIMPAR_TERMO_ASPAS.sub('"', termo).strip()
             #print('Termo limpo: ', termo)
         # para apresentação mostra o termo real somente sem acento
         return termo
@@ -567,7 +575,7 @@ class PesquisaElasticFacil():
         return res
 
     # caso seja uma lista de uma única sublista, remove um nível 
-    def corrigir_sublistas_desnecessarias(self,criterios_lista):
+    def corrigir_sublistas_desnecessarias(self,criterios_lista, raiz = True):
         #if TESTE_DEBUG: print(f'Sublistas: {criterios_lista}')
         res = []
         for token in criterios_lista:
@@ -582,12 +590,14 @@ class PesquisaElasticFacil():
                 if len(token) == 0:
                     continue
                 if type(token) is list:
-                    token = self.corrigir_sublistas_desnecessarias(token)
+                    token = self.corrigir_sublistas_desnecessarias(token, False)
             res.append(token)
         # remove subníveis desnecessários da raiz
         if len(res) == 1:
-            res = res[0]
-        if TESTE_DEBUG: print(f'   --->  : {res}')
+            # se for uma lista, remove, se for raiz e for um token, mantém
+            if type(res[0]) is list or not raiz:
+                res = res[0]
+        if TESTE_DEBUG: print(f' -- sublistas --->  : {res}')
         return res 
 
     def quebra_aspas_adj1(self, texto):
@@ -642,7 +652,7 @@ class PesquisaElasticFacil():
         if aspas_txt:
             _novos_tokens = self.quebra_aspas_adj1(aspas_txt.strip())
             res.append(_novos_tokens)
-        if TESTE_DEBUG: print(f'      ----> : {res}')
+        if TESTE_DEBUG: print(f' -- aspas ----> : {res}')
         return res 
 
     def reformatar_criterios(self, criterios_lista):
@@ -903,17 +913,23 @@ class PesquisaElasticFacilTeste():
             saida1 = Operadores.formatar_token(token)
             saida2 = PesquisaElasticFacil.as_query_operador(saida1,operador.upper(),'texto')
             _teste_json = json.dumps(saida2)
-            _teste_chave1 = chave1 in saida2 # testa a primeira chave
+            _teste_chave1 = chave1 in saida2.keys() # testa a primeira chave
             _teste = saida2.get('span_multi',{}).get('match',{}).get('wildcard',{}).get('texto',{})
             if not any(_teste): _teste = saida2.get('span_multi',{}).get('match',{}).get('regexp',{}).get('texto',{})
             if not any(_teste): _teste = saida2.get('span_term',{}).get('texto',{})
             if not any(_teste): _teste = saida2.get('term',{}).get('texto',{})
             if not any(_teste): _teste = saida2.get('regexp',{}).get('texto',{})
-            saida2 = ''
-            if any(_teste):
-                saida2 = ','.join([str(_).lower() for _ in sorted(_teste.items())])
+            if not any(_teste): _teste = saida2.get('wildcard',{}).get('texto',{})
+            if not _teste_chave1: 
+                saida2 = f'* chave {chave1} não encontrada'
+            else:
+                saida2 = ''
+                if any(_teste):
+                    if type(_teste) is str:
+                        saida2 = _teste
+                    else:
+                        saida2 = ','.join([str(_).lower() for _ in sorted(_teste.items())])
             if esperado != saida2 or not _teste_chave1:
-                if not _teste_chave1: saida2 = f'chave {chave1} não encontrada'
                 msg = f'TESTE PesquisaElasticFacil - OPERADOR: \nCritério ({i}):\n- Entrada:  {token}\n- Saída1:   {saida1}\n- Saída2:   {saida2}\n- Json:   {_teste_json}\n- Esperado: {esperado}\n'
                 raise Exception(msg)
         # testes de tradução
