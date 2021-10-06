@@ -23,9 +23,12 @@
 #                          - ADJn: lista de termos NÃO (lista de termos)
 #                          - PROXn: lista de termos NÃO (lista de termos)
 # Ver 0.1.3 - 06/10/2021 - correção termo único na pesquisa, correção de aspas simples e inclusão de mais testes
+# Ver 0.2.3 - 06/10/2021 - correção slop 
 #
 # TODO: 
+# - inclusão de grupos de pesquisa
 # - criar testes para queries do Elastic transformadas
+# - sinônimos - aspas em todo o grupo slop - com aspas usa campo raw para o grupo slop
 # - retornar uma lista de warnings com transformações corrigidas automaticamente
  
 import re
@@ -309,6 +312,7 @@ class Operadores():
                    tem_slop = True
                elif not self.e_operador_nao(novo):               
                    tem_simples = True
+               if not self.e_operador_nao(novo):
                    n = max(n,novo_n) # busca o maior n
                    operador = novo
         # tem operador prox ou adj misturado com simples ou grupo, retorna erro
@@ -960,6 +964,7 @@ if __name__ == "__main__":
         teste = 'a123456,??  dano? prox5 mora? dano adj20 material estetic??'
         teste = '25/06/1976 (123,456.789-00 e 25:06:1976)'
         teste = 'inss aposentadoria NÃO (administrativamente ou administrativa)'
+        teste = '(dano ADJ1 moral)'
         pbe = PesquisaElasticFacil(teste)
         print('Original : ', teste.strip())
         print('Critérios: ', pbe.criterios_reformatado)
