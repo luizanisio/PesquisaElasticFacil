@@ -18,6 +18,7 @@
 
 #### Painel com os resultados retornados pela pesquisa, o tempo e o total de documentos encontrados
 <i> > é um exemplo simples de como o resultado pode ser apresentado com trechos do documento onde os termos foram encontrados, o id do documento e o scrore de pesquisa</i><br>
+<i> > poderia ser incluído um link `buscar semelhantes` ao lado do `id` do documento, os semelhantes poderiam ser buscados pela similaridade vetorial combinada com critérios textuais e critérios de metadados escolhidos pelo usuário </i><br>
 ![Painel com resultados](img/img001_tela_criterios_resultados.png?raw=true "Title")
 
 #### Painel para envio de arquivos para processamento
