@@ -26,8 +26,10 @@
 ### Alguns códigos do serviço:
 - chamada para retornar os documentos que serão apresentados:
   ```python
-  def qualquer():
-      # recebe os creitérios no request e realiza a pesquisa
+  @app.route(f'{PATH_API}testar_criterios',methods=['GET','POST'])
+  def testar_criterios():
+      # [...] recebe os critérios no request e realiza a pesquisa
+      criterios = get_criterios_request(request)
       retorno_elastic = get_retorno_elastic(ES, es_indice=ES_INDICE, es_campo=ES_CAMPO, criterios=criterios)
       # apresenta os resultados no template
       return render_template("aplicar_pesquisa.html", 
