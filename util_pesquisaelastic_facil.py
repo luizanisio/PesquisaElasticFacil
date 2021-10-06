@@ -23,7 +23,7 @@
 #                          - ADJn: lista de termos NÃO (lista de termos)
 #                          - PROXn: lista de termos NÃO (lista de termos)
 # Ver 0.1.3 - 06/10/2021 - correção termo único na pesquisa, correção de aspas simples e inclusão de mais testes
-# Ver 0.2.3 - 06/10/2021 - correção slop 
+# Ver 0.1.4 - 06/10/2021 - correção slop 
 #
 # TODO: 
 # - inclusão de grupos de pesquisa
