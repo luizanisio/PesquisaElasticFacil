@@ -66,7 +66,7 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
  - Por limitação do tratamento de sinônimos do ElasticSearch, grupos com termos entre ADJ e PROX são considerados todos entre aspas ou todos sem aspas. Sendo assim, ao colocar aspas em um termo do conjunto, todos os termos serão considerados entre aspas. Isso ocorre pois todos os termos serão pesquisados em um campo indexado sem sinônimos (ex. `texto.raw`).
    - Exemplo: `"dano" adj1 "moral" adj1 estético` ==> `"dano" ADJ1 "moral" ADJ1 "estético"`
- - Veja mais detalhes sobre o uso de sinônimos aqui: [ElasticSinonimos](ElasticSinonimos.md)
+ - Veja mais detalhes sobre o uso de sinônimos aqui: [`ElasticSinonimos`](ElasticSinonimos.md)
 
 ## Pesquisa "inteligente": 
  - A ideia é permitir ao usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante sem a necessidade de uso operadores.
