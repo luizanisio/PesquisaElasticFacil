@@ -23,9 +23,9 @@ queryelastic = pbe.criterios_elastic_highlight
   <li> <b>NÃO</b>: nega a existência de um termo no documento </li>
   <li> <b>OU</b> entre termos: indica que um ou outro termo podem ser encontrados para satisfazer a pesquisa</li>
   <li> <b>OU</b> com parênteses: permite realizar pesquisas mais complexas onde um ou outro grupo são aceitos.</li>
-  <li> <b>ADJ</b>n: permite localizar termos que estejam até n termos a frente do primeiro termo.</li>
-  <li> <b>PROX</b>n: semelhante ao <b>ADJ</b>, mas localiza termos posteriores ou anteriores ao primeiro termo pesquisado.</li>
-  <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por 'PROX30' até ser encontrada uma forma mais próxima de pesquisa.</li>
+  <li> <b>ADJ</b>n: permite localizar termos que estejam adjacentes até n termos a frente do primeiro termo (ADJ1 é o termo seguinte).</li>
+  <li> <b>PROX</b>n: semelhante ao <b>ADJ</b>, mas localiza termos posteriores ou anteriores ao primeiro termo pesquisado (PROX1 é o termo anterior ou o próximo).</li>
+  <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por 'PROX30' até ser encontrada uma forma mais próxima de pesquisa no ElasticSearch.</li>
 </ul>
 
 Queries no Elastic que permitem a transformação dos operadores: [ElasticQueries](ElasticQueries.md) 
