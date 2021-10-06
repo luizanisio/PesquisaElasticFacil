@@ -99,7 +99,6 @@
               else:
                   txt = _source.pop(es_campo,'')
               txt = txt.replace('<em>','<mark>').replace('</em>','</mark>')
-              #print(txt)
               doc = {'id' : doc.get('_id',{}),
                      'score' : doc.get('_score',{}),
                      es_campo : Markup(txt)}
