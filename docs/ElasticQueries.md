@@ -94,7 +94,7 @@ GET /explorasim/_search
 - nesse caso o vetor treinado com o `Doc2VecFacil` ou qualquer outro modelo ou técnica de vetorização textual armazenado como array float no campo mapeado para esse tipo de pesquisa como no exemplo de mapeamento apresentado no início desa página.
 - Em `"params": {"query_vector: [] ..."` coloca-se o array float do vetor do documento em análise e a pesquisa vai retornar os documentos com maior similaridade vetoria.
 - A pesquisa pode ser combinada com `More like this`, `span_near` e qualquer outra formação de query do elastic, permitindo pesquisas robusas, mas cada vez mais complexas para um usuário comum construir.
-- Essa foi a motivação de um componente que permitisse transformar operadores simples de usar em pesquisas mais robustas e precisas que o ElasticSearch permite construir: [PesquisaElasticFacil](https://github.com/luizanisio/PesquisaElasticFacil/blob/main/README.md) 
+- Essa foi a motivação de um componente que permitisse transformar operadores simples de usar em pesquisas mais robustas e precisas que o ElasticSearch permite construir: [`PesquisaElasticFacil`](https://github.com/luizanisio/PesquisaElasticFacil/blob/main/README.md) 
 ```json
 { "_source": ["titulo"],
   "query": {
