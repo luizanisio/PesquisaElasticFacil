@@ -2,7 +2,7 @@
 
 Componente python que simplifica a construção de queries no ElasticSearch e permite o uso dos operadores de proximidade de termos, comuns no BRS, em queries internas do ElasticSearch. Não há intenção de competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios próximos no elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
-- Código do componente python: [PesquisaElasticFacil](util_pesquisaelastic_facil.py) `atualizado: 06/10/2021`
+- Código do componente python: [`PesquisaElasticFacil`](src/util_pesquisaelastic_facil.py) `atualizado: 06/10/2021`
 - Uso do componente: 
 ```python
 from util_pesquisaelastic_facil.py import PesquisaElasticFacil
@@ -14,7 +14,7 @@ queryelastic = pbe.criterios_elastic_highlight
 ```
 - Depois é só rodar a query no ElasticSearch
 
-- [`Serviço Exemplo`](servico_exemplo.md) : um exemplo simples de como o componente pode ser utilizado, os códigos serão disponibilizados em breve pois estou trabalhando na parte de envio de arquivos para indexação e vetorização.
+- [`Serviço Exemplo`](docs/servico_exemplo.md) : um exemplo simples de como o componente pode ser utilizado, os códigos serão disponibilizados em breve pois estou trabalhando na parte de envio de arquivos para indexação e vetorização.
 
 
 ## Operadores:
@@ -28,7 +28,7 @@ queryelastic = pbe.criterios_elastic_highlight
   <li> <b>COM</b>: não disponível no Elastic, seria para buscar termos no mesmo parágrafo. Será substituído arbitrariamente por 'PROX30' até ser encontrada uma forma mais próxima de pesquisa no ElasticSearch.</li>
 </ul>
 
-Queries no Elastic que permitem a transformação dos operadores: [ElasticQueries](ElasticQueries.md) 
+Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueries`](/docs/ElasticQueries.md) 
 
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
@@ -66,7 +66,7 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
  - Por limitação do tratamento de sinônimos do ElasticSearch, grupos com termos entre ADJ e PROX são considerados todos entre aspas ou todos sem aspas. Sendo assim, ao colocar aspas em um termo do conjunto, todos os termos serão considerados entre aspas. Isso ocorre pois todos os termos serão pesquisados em um campo indexado sem sinônimos (ex. `texto.raw`).
    - Exemplo: `"dano" adj1 "moral" adj1 estético` ==> `"dano" ADJ1 "moral" ADJ1 "estético"`
- - Veja mais detalhes sobre o uso de sinônimos aqui: [`ElasticSinonimos`](ElasticSinonimos.md)
+ - Veja mais detalhes sobre o uso de sinônimos aqui: [`ElasticSinonimos`](/docs/ElasticSinonimos.md)
 
 ## Pesquisa "inteligente": 
  - A ideia é permitir ao usuário copiar um texto e definir poucas ou nenhuma opção e encontrar documentos que contenham uma escrita semelhante sem a necessidade de uso operadores.
@@ -102,7 +102,7 @@ Queries no Elastic que permitem a transformação dos operadores: [ElasticQuerie
 ## Exemplo de queries transformadas:
  - Escrito pelo usuário: `dano prox5 moral dano adj20 material estetico`
  - Ajustado pela classe: `(dano PROX5 moral) E (dano ADJ20 material) E estetico`
- - Dicas de construção de queries no Elastic: [ElasticQueries](ElasticQueries.md) 
+ - Dicas de construção de queries no Elastic: [`ElasticQueries`](/docs/ElasticQueries.md) 
  - Query do Elastic criada: 
  ```json
  {"query": {"bool": 
