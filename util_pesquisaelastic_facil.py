@@ -24,6 +24,7 @@
 #                          - PROXn: lista de termos NÃO (lista de termos)
 # Ver 0.1.3 - 06/10/2021 - correção termo único na pesquisa, correção de aspas simples e inclusão de mais testes
 # Ver 0.1.4 - 06/10/2021 - correção slop 
+# Ver 0.1.5 - 06/10/2021 - termos entre aspas usa o campo_texto_raw para todos do slop
 #
 # TODO: 
 # - inclusão de grupos de pesquisa
@@ -110,8 +111,8 @@ TESTES_OPERADORES = (
     ('ca?a*', 'E', 'regexp', "('case_insensitive', true),('value', 'ca.{0,1}a.*')"),
     ('?ca?a*', 'PROX10', 'span_multi', "('case_insensitive', true),('value', '.{0,1}ca.{0,1}a.*')"),
     ('2020', 'E', 'regexp', "('case_insensitive', true),('value', '2_?020')"),
-    ('"/ano/"','E','wildcard',"('case_insensitive', true),('value', 'ano')"),
-    ("'/plano/'",'E','wildcard',"('case_insensitive', true),('value', 'plano')"),
+    ('"/ano/"','E','term',"ano"),
+    ("'/plano/'",'E','term',"plano"),
     ("/plana,",'E','term',"plana"),
 )
 
@@ -361,10 +362,30 @@ class Operadores():
         #print('saída termos format: ', termo)
         return termo
 
-
     @classmethod
     def remover_acentos(self, txt):
         return normalize('NFKD', txt).encode('ASCII', 'ignore').decode('ASCII')
+
+    @classmethod
+    def campo_texto_grupo(self, criterios, campo_texto, campo_texto_raw, unico = False):
+        aspas = filter(lambda k:type(k) is str and k.find('"')>=0,criterios)
+        res = campo_texto_raw if any(aspas) and campo_texto_raw else campo_texto
+        if not unico:
+            return res 
+        if type(res) is str:
+            return res
+        return list(res)[0] if any(res) else 'texto'
+
+    @classmethod
+    def campo_texto_termo(self, termo, campo_texto, campo_texto_raw, unico = False):
+        aspas = type(termo) is str and termo.find('"')>=0
+        res = campo_texto_raw if aspas and campo_texto_raw else campo_texto
+        if not unico:
+            return res 
+        if type(res) is str:
+            return res
+        return list(res)[0] if any(res) else 'texto'
+
 
 ###########################################################
 # Recebe um critério de pesquisa livre estilo BRS 
@@ -387,12 +408,13 @@ class PesquisaElasticFacil():
     RE_INTELIGENTE = re.compile('^(adj\d*|prox\d*|cont[ée]m):', re.IGNORECASE)
     RE_NAO = re.compile(r'\s+n[aã]o\s*\([^\)]+\)')
     RE_NAO_LIMPAR = re.compile(r'(\s+n[aã]o\s*\()|(\()|(\))')
-    def __init__(self, criterios_originais,  campo_texto = 'texto'):
+    def __init__(self, criterios_originais,  campo_texto = 'texto', campo_texto_raw = None):
         self.pesquisa_inteligente = self.RE_INTELIGENTE.match(criterios_originais)
         self.criterios_originais = str(criterios_originais)
         self.contem_operadores_brs = False
         self.contem_operadores = False
         self.campo_texto = str(campo_texto)
+        self.campo_texto_raw = self.campo_texto if not campo_texto_raw else campo_texto_raw
         self.criterios_listas = []
         if self.pesquisa_inteligente:
             self.executar_pesquisa_inteligente()
@@ -675,33 +697,6 @@ class PesquisaElasticFacil():
         # retorna uma string com os critérios
         return ' '.join(lista).replace('( ','(').replace(' )',')')
 
-    # recebe uma lista de listas de critérios e retorna um conjunto de termos 
-    # que foram incluídos em grupos not e um conjunto de critérios que sobraram
-    # serve para criar o more like this com like e unlike
-    @classmethod
-    def separar_criterios_not(self, criterios_completos):
-        criterios = []
-        criterios_not = []
-        # o NÃO só afeta o próximo termo ou a próxima lista
-        def _separar(lista, cr_not_total = False):
-            cr_not = False
-            for lst in lista:
-                if type(lst) is str:
-                    if lst == 'NAO':
-                        cr_not = True
-                    elif cr_not or cr_not_total:
-                        criterios_not.append(lst)
-                        cr_not = False
-                    else:
-                        criterios.append(lst)
-                        cr_not = False
-                elif any(lista):
-                    _separar(lst, cr_not or cr_not_total)
-                    cr_not = False
-
-        _separar(criterios_completos)
-        return criterios, criterios_not
-
     # cria os critérios do elastic com o more like this
     # todos os grupos de not são agrupados em um único must not 
     # operadores e aspas são removidos
@@ -773,6 +768,7 @@ class PesquisaElasticFacil():
         operador_nao = False
         # busca o primeiro operador para análise do grupo
         operador_grupo, n_grupo = Operadores.operador_n_do_grupo(grupo)
+        _campo_texto_slop = Operadores.campo_texto_grupo(grupo, self.campo_texto, self.campo_texto_raw, unico = True)
         if TESTE_DEBUG: print('Operador do grupo: ', operador_grupo, grupo)
         for token in grupo:
             # se for o operador não/not - apenas guarda a referência
@@ -794,10 +790,17 @@ class PesquisaElasticFacil():
                 # verifica o tipo do grupo e monta o operador do termo
                 if operador_nao:
                     # não com termo é um must_not simples
-                    grupo_convertido = self.as_query_operador(token, Operadores.OPERADOR_PADRAO, self.campo_texto)
+                    _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, campo_texto_raw=self.campo_texto_raw, unico=True)
+                    grupo_convertido = self.as_query_operador(token, Operadores.OPERADOR_PADRAO, _campo_texto)
                     must_not.append( grupo_convertido )
                 else:
-                    grupo_convertido = self.as_query_operador(token, operador_grupo, self.campo_texto)
+                    # critérios slop são todos entre aspas ou todos sem aspas pois precisam
+                    # ser aplicados no mesmo campo
+                    if Operadores.e_operador_slop(operador_grupo):
+                        _campo_texto = _campo_texto_slop
+                    else:
+                        _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, campo_texto_raw=self.campo_texto_raw, unico=True)
+                    grupo_convertido = self.as_query_operador(token, operador_grupo, _campo_texto)
                     if Operadores.e_operador_slop(operador_grupo):
                         span_near.append( grupo_convertido )
                     elif Operadores.e_operador_ou(operador_grupo):
@@ -821,18 +824,18 @@ class PesquisaElasticFacil():
     @classmethod
     def as_query_operador(self, token, operador_grupo, campo_texto = None):
         token = token.lower()
-        # wildcard - se o termo for entre aspas vira regex do próprio termo
-        _aspas = token.find('"')>=0 or token.find("'")>=0
-        _wildcard = token.find('*')>=0 or _aspas
+        # wildcard - se o termo for entre aspas usa o campo raw, mas isso quem resolve é quem chama o método
+        #_aspas = token.find('"')>=0 or token.find("'")>=0
+        _wildcard = token.find('*')>=0 
         _regex = token.find('?')>=0 or Operadores.RE_TERMO_NUMERICO.match(token)
         _token = Operadores.remover_acentos(token)
-        _token = _token.replace("'",'').replace('"','')
+        _token = _token.replace("'",'').replace('"','') # remove aspas
         if _wildcard and not _regex:
             _wildcard = { "wildcard": {f"{campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
             if Operadores.e_operador_slop(operador_grupo):
                 return { "span_multi" : { "match": _wildcard } } 
             return _wildcard 
-        elif _regex or _aspas:
+        elif _regex :
             _token = Operadores.termo_regex_interroga(_token)
             _regex = { "regexp": {f"{campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
             if Operadores.e_operador_slop(operador_grupo):
@@ -881,16 +884,15 @@ class PesquisaElasticFacil():
             self.criterios_elastic = self.as_query_slop(criterios=_criterios, 
                                                         criterios_nao=_criterios_nao, 
                                                         campos_texto=self.campo_texto,
+                                                        campos_texto_raw=self.campo_texto_raw,
                                                         distancia = distancia,
                                                         ordem = ordem)  
 
-    def as_query_slop(self, criterios, criterios_nao, campos_texto, distancia, ordem):
-        if type(campos_texto) is str:
-            _campo = campos_texto 
-        else:
-            _campo = list(campos_texto)[0] if any(campos_texto) else 'texto'
+    def as_query_slop(self, criterios, criterios_nao, campos_texto, campos_texto_raw, distancia, ordem):
+        _campo = Operadores.campo_texto_grupo(criterios, campo_texto=campos_texto, campo_texto_raw=campos_texto_raw, unico=True)
+        _campo_nao = Operadores.campo_texto_grupo(criterios_nao, campo_texto=campos_texto, campo_texto_raw=campos_texto_raw, unico=True)
         span_near = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo) for _ in criterios]
-        span_near_nao = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo) for _ in criterios_nao]
+        span_near_nao = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo_nao) for _ in criterios_nao]
         qspan_near = {'clauses' : span_near, 'slop' : max(0, distancia), 'in_order' : ordem}
         qspan_near_nao = {'clauses' : span_near_nao, 'slop' : max(0, distancia), 'in_order' : ordem}
 
