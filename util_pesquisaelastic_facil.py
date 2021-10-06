@@ -12,17 +12,28 @@
 # Luiz Anísio 
 # Ver 0.1.0 - 03/10/2021 - disponibilizado no GitHub  
 # Ver 0.1.1 - 03/10/2021 - highlight no MLT
+# Ver 0.1.2 - 05/10/2021 - ajustes MLT, lower() e limpeza dos termos de pesquisa
+#                        - no elastic número com ./- vira _ para juntar os tokens
+#                        - no python, a pesquisa usa regex "(\\d+)[\\.\\-\\/](?=\\d)" para $1_
+#                        - corrige numeros puros para números com _?  1234 ==> 1_?234
+#                        - corrige curingas repetidos 
+#                        - testes de transformação de curingas
+#                        - testes de transformação de operadores finais
+#                        - pesquisas inteligentes:
+#                          - ADJn: lista de termos NÃO (lista de termos)
+#                          - PROXn: lista de termos NÃO (lista de termos)
 #
 # TODO: 
 # - criar testes para queries do Elastic transformadas
 # - retornar uma lista de warnings com transformações corrigidas automaticamente
  
 import re
+from types import ClassMethodDescriptorType
 from unicodedata import normalize
 import json
 from copy import deepcopy
 
-TESTES = ( ('dano Adj moRal','dano ADJ1 moRal'),
+TESTES = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
            ('"dano moral','"dano" ADJ1 "moral"'),
            ('dano com moral','dano PROX30 moral'),
            ('nao "dano moral" dano prox5 material','NAO ("dano" ADJ1 "moral") E (dano PROX5 material)'),
@@ -31,12 +42,12 @@ TESTES = ( ('dano Adj moRal','dano ADJ1 moRal'),
            ('termo1 E termo2 termo3 NÃO termo4' , 'termo1 E termo2 E termo3 NAO termo4'),
            ('termo1 E termo2 termo3 NÃO termo4 ou termo5' , 'termo1 E termo2 E termo3 NAO (termo4 OU termo5)'),
            ('dano moral e material','dano E moral E material'),
-           ('dano prox5 material e estético', '(dano PROX5 material) E estético'),
-           ('dano prox5 material estético', '(dano PROX5 material) E estético'),
-           ('estético dano prox5 material', 'estético E (dano PROX5 material)'),
-           ('estético e dano prox5 material', 'estético E (dano PROX5 material)'),
-           ('dano moral (dano prox5 "material e estético)','dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estético"))'),
-           ('(dano moral) prova (agravo (dano prox5 "material e estético))','(dano E moral) E prova E (agravo E (dano E ("material" ADJ1 "e" ADJ1 "estético")))'),
+           ('dano prox5 material e estético', '(dano PROX5 material) E estetico'),
+           ('dano prox5 material estético', '(dano PROX5 material) E estetico'),
+           ('estético dano prox5 material', 'estetico E (dano PROX5 material)'),
+           ('estético e dano prox5 material', 'estetico E (dano PROX5 material)'),
+           ('dano moral (dano prox5 "material e estético)','dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estetico"))'),
+           ('(dano moral) prova (agravo (dano prox5 "material e estético))','(dano E moral) E prova E (agravo E (dano E ("material" ADJ1 "e" ADJ1 "estetico")))'),
            ('teste1 adj2 teste2 prox3 teste3 teste4', '(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4'),
            ('termo1 E termo2 OU termo3 OU termo4' , 'termo1 E (termo2 OU termo3 OU termo4)'),
            ('termo1 E termo2 OU (termo3 adj2 termo4)' , 'termo1 E (termo2 OU (termo3 ADJ2 termo4))'),
@@ -49,6 +60,10 @@ TESTES = ( ('dano Adj moRal','dano ADJ1 moRal'),
            ('termo1 OU termo2 nao termo3' , '(termo1 OU termo2) NAO termo3'),
            ('termo1 OU termo2 nao (termo3 Ou termo4)' , '(termo1 OU termo2) NAO (termo3 OU termo4)'),
            ('((termo1 OU termo2) nao (termo3 Ou termo4)) termo5 prox10 termo6' , '((termo1 OU termo2) NAO (termo3 OU termo4)) E (termo5 PROX10 termo6)'),
+           ('termo1, termo2:texto3 nao [termo4]' , 'termo1 E termo2 E texto3 NAO termo4'),
+           ('123.456.789,123 25/06/1976 25_06_1976 a.b a-b a,b','123.456.789,123 E 25/06/1976 E 25_06_1976 E a E b E a E b E a E b'),
+           ('123:456.789,123 25_06_1976 a|b:c:: a1|2b:c3::','123:456.789,123 E 25_06_1976 E a E b E c E a1 E 2b E c3'),
+           ('(123:456.789,123 (25_06_1976 a|b:c::)) a1|2b:c3::','(123:456.789,123 E (25_06_1976 E a E b E c)) E a1 E 2b E c3'),
         )
 
 TESTES_ENTRADA_FALHA = ( 
@@ -64,7 +79,33 @@ TESTES_ENTRADA_FALHA = (
            ('dano e ou adj5 (adj5) prox5 e moRal','dano E moRal'),
            ('(termo1) ADJ1 (termo2)','termo1 ADJ1 termo2'),
            ('nao (termo1) nao ADJ1 (termo2)','NAO (termo1 ADJ1 termo2)'),
+           ('a123456,??  dano? prox5 mora? dano adj20 material estetic??','a123456 E (dano? PROX5 mora?) E (dano ADJ20 material) E estetic??')
         )
+
+TESTES_CURINGAS = (
+    ('casa*',  'casa.*'), ('casa','casa'), ('ca$sa','ca.*sa'), 
+    ('?ca$sa','.{0,1}ca.*sa'), ('?ca$s*a','.{0,1}ca.*s.*a'), 
+    ('*$ca???sa??','.*ca.{0,3}sa.{0,2}'), 
+    ('casa?', 'casa.{0,1}'), 
+    ('ca??sa?', 'ca.{0,2}sa.{0,1}'),
+    ('?ca??sa?', '.{0,1}ca.{0,2}sa.{0,1}'),
+    ('123.456,??', '123_?456_?.{0,2}'),
+    ('123.456', '123_?456'), ('123456', '123_?456'),
+    ('1234567', '1_?234_?567'),
+    ('123456,??', '123_?456_?.{0,2}'),
+    ('a123456,??', 'a123456 .{0,2}'), ('123:456.789,123','123_?456_?789_?123'),
+    ('25/06/1976','25_?06_?1976'), ('25:06:1976','25_?06_?1976'), 
+    ('123,456.789-00','123_?456_?789_?00'), ('123-456-789-00','123_?456_?789_?00'),
+    ('123::456.789-00','123_?456_?789_?00')
+)
+
+TESTES_OPERADORES = (
+    ('casa*', 'ADJ1', 'span_multi', "('case_insensitive', true),('value', 'casa*')"),
+    ('ca??', 'ADJ2', 'span_multi', "('case_insensitive', true),('value', 'ca.{0,2}')"),
+    ('ca?a*', 'E', 'regexp', "('case_insensitive', true),('value', 'ca.{0,1}a.*')"),
+    ('?ca?a*', 'PROX10', 'span_multi', "('case_insensitive', true),('value', '.{0,1}ca.{0,1}a.*')"),
+)
+
 
 TESTE_DEBUG = False
 
@@ -79,10 +120,17 @@ class Operadores():
     RE_TOKEN_PROX = re.compile(r'proxc?\d*',re.IGNORECASE)
     RE_TOKEN_COM = re.compile(r'com?\d*',re.IGNORECASE)
     RE_TOKEN_N = re.compile(r'\d+')
+    RE_TERMO_NUMERICO = re.compile(r'[\d\?\*][\d\:\?\*\.\,\-\_\/]*[\d\?\*]$') 
+    RE_TERMO_MILHAS = re.compile(r'[\d\?\*][\d\?\*\.\,]*[\d\?\*]$') 
+    RE_TERMO_SO_CURINGA = re.compile(r'[\?\*\_\$]+$') 
+    RE_TOKEN_QUEBRA_N = re.compile(r'[\d\.\-_\/\,\?\*\:]+$') # 123.233/2332-23,23 ou curingas - verifica se é um token numérico
+    RE_TOKEN_QUEBRA_N_FORMAT = re.compile(r'[\.\-_\/\,\:]+') # 123.233/2332-23,23 ou curingas - corrige símbolos por _
     RE_TOKEN_OU = re.compile(r'ou',re.IGNORECASE)
     RE_TOKEN_E = re.compile(r'e',re.IGNORECASE)
-    RE_TOKEN_INTERROGA = re.compile(r'[\?]+')
-    RE_TOKEN_NAO_INTERROGA = re.compile(r'[^\?]+')
+    RE_TOKEN_INTERROGA = re.compile(r'([\?]+)')
+    RE_TOKEN_ASTERISCO = re.compile(r'([\*\$]+)')
+    RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"]') # o token já estará sem acentos
+    RE_LIMPAR_TERMO_MLT = re.compile(f'[^A-Za-z\d]') # tokens limpos de pesquisa
     OPERADOR_PADRAO = 'E'
     OPERADOR_ADJ1 = 'ADJ1'
     # retorna true se o token recebido é um critério conhecido
@@ -162,19 +210,63 @@ class Operadores():
             return criterio
         return ''
 
+    # formatar termos e operadores de pesquisa
+    @classmethod
+    def formatar_token(self, token):
+        if self.e_operador(token):
+            return self.formatar_operador(token)
+        return self.formatar_termo(token)
+
+    # formata os tokens e quebra tokens com caracteres estranhos como termo1:termo2
+    @classmethod
+    def formatar_tokens(self, criterios_lista):
+        #print('Formatar tokens: ', criterios_lista)
+        res = []
+        for token in criterios_lista:
+            if type(token) is list:
+                res.append(self.formatar_tokens(token))
+            else:
+                _tk = self.formatar_token(token)
+                if (not _tk) or self.RE_TERMO_SO_CURINGA.match(_tk):
+                    continue
+                tokens = _tk.split(' ')
+                res += [_ for _ in tokens if not self.RE_TERMO_SO_CURINGA.match(_) ]
+        #print('- tokens: ', criterios_lista)
+        return res 
+
+    # dica em https://pt.stackoverflow.com/questions/8526/tratar-n%C3%BAmeros-python-adicionando-ponto
+    @classmethod
+    def formatar_numeros_milhar(self, s):
+        if s.find('.')>=0: return s
+        virgula = f'{s},'.split(',')
+        if virgula[1]: virgula[1] = ','+virgula[1]
+        #print('Virgula: ', virgula)
+        s = virgula[0]
+        return s + virgula[1] if len(s) <= 3 else self.formatar_numeros_milhar(s[:-3]) + '.' + s[-3:] + virgula[1]   
+
+    # formata os termos para apresentação ou para pesquisa
+    @classmethod
+    def formatar_termo(self, termo):
+        # tratamento padrão
+        termo = Operadores.remover_acentos(termo)
+        if not self.RE_TERMO_NUMERICO.match(termo):
+            #print('Limpando termo não numérico: ', termo)
+            termo = Operadores.RE_LIMPAR_TERMO_NAO_NUMERICO.sub(' ', termo).strip()
+            #print('Termo limpo: ', termo)
+        # para apresentação mostra o termo real somente sem acento
+        return termo
+
     @classmethod
     # formata os tokens de critérios para padronização
-    def formatar_operador(self, termo):
-        if not self.e_operador(termo):
-            return termo
-        if self.e_operador_adj(termo):
-            cr = f'ADJ{self.n_do_operador(termo)}'
+    def formatar_operador(self, operador):
+        if self.e_operador_adj(operador):
+            cr = f'ADJ{self.n_do_operador(operador)}'
             self.contem_operadores_brs = True
-        elif self.e_operador_prox(termo):
-            cr = f'PROX{self.n_do_operador(termo)}'
+        elif self.e_operador_prox(operador):
+            cr = f'PROX{self.n_do_operador(operador)}'
             self.contem_operadores_brs = True
-        elif self.e_operador_com(termo):
-            n = self.n_do_operador(termo)
+        elif self.e_operador_com(operador):
+            n = self.n_do_operador(operador)
             # todo avaliar melhor solução para se 
             # aproximar do operador COM - mesmo parágrafo
             #cr = f'COM{n}' if n>1 else 'COM'
@@ -182,7 +274,7 @@ class Operadores():
             self.contem_operadores_brs = True
         else:
             self.contem_operadores = True
-            cr = termo.upper()
+            cr = operador.upper()
             cr = 'E' if cr == 'AND' else cr 
             cr = 'OU' if cr == 'OR' else cr 
             cr = 'NAO' if cr in ('NOT','NÃO') else cr 
@@ -209,8 +301,8 @@ class Operadores():
                    tem_slop = True
                elif not self.e_operador_nao(novo):               
                    tem_simples = True
-               n = max(n,novo_n) # busca o maior n
-               operador = novo
+                   n = max(n,novo_n) # busca o maior n
+                   operador = novo
         # tem operador prox ou adj misturado com simples ou grupo, retorna erro
         if tem_slop and (tem_simples or tem_grupo):
             _msg = f'Operadores: foi encontrado um grupo com operadores simples e de proximidade juntos: {grupo}'
@@ -219,13 +311,48 @@ class Operadores():
 
     # substitui critérios de ? por .{0,n} para permitir ser opcional
     @classmethod
-    def token_regex_interroga(self, texto):
-        qtd = len(self.RE_TOKEN_NAO_INTERROGA.sub('',texto))
-        if qtd == 0:
-            return texto
-        _sub = '.{' + f'0,{qtd}' + '}'
-        #print('regex: ', texto, qtd, self.RE_TOKEN_INTERROGA.sub(_sub, texto) )
-        return self.RE_TOKEN_INTERROGA.sub(_sub, texto)
+    def termo_regex_interroga(self, termo):
+        if termo.find('*')>=0 or termo.find('$')>=0:
+            # corrige * ou $ seguidos mas não coloca o .* ainda
+            # para não atrapalhar o controle de números \d.\d
+            termo = self.RE_TOKEN_ASTERISCO.sub('*', termo)
+        termo = self.formatar_termo_numerico_pesquisa(termo)
+        termo = termo.replace('_?','_!') # curinga de números para não substituir
+        termos = self.RE_TOKEN_INTERROGA.split(termo)
+        termo = ''
+        for t in termos:
+            if t.find('?')>=0:
+               termo = termo + '.{' + f'0,{len(t)}' + '}'
+            elif t:
+                termo += t
+        termo = termo.replace('_!','_?') # curinga de números retornando
+        return termo.replace('*','.*')
+
+    @classmethod
+    def formatar_termo_numerico_pesquisa(self, termo):
+        if not self.RE_TERMO_NUMERICO.match(termo):
+            return termo
+        # números puros com . ou , divide os milhares e insere _? 
+        if self.RE_TERMO_MILHAS.match(termo):
+            #print('milhas: ', termo)
+            termo = self.formatar_numeros_milhar(termo)
+            #print('milhas saída: ', termo)
+        # números com ./-,_ substitui por _?
+        if self.RE_TOKEN_QUEBRA_N.match(termo):
+            #print('quebra n: ', termo)
+            termo = self.RE_TOKEN_QUEBRA_N_FORMAT.sub('_?', termo)
+            #print('quebra n saída: ', termo)
+            return termo
+        # sobrou separadores numéricos, remove para quebrar o token
+        #print('termos format: ', termo)
+        termo = self.RE_LIMPAR_TERMO_NAO_NUMERICO.sub(' ',termo).strip()
+        #print('saída termos format: ', termo)
+        return termo
+
+
+    @classmethod
+    def remover_acentos(self, txt):
+        return normalize('NFKD', txt).encode('ASCII', 'ignore').decode('ASCII')
 
 ###########################################################
 # Recebe um critério de pesquisa livre estilo BRS 
@@ -238,37 +365,48 @@ class PesquisaElasticFacil():
     # critérios prox e adj antes e depois de parênteses serão substituídos por E
     # termos seguidos sem eperadores serão considerados com o operador E entre eles
     # not sem parênteses será aplicado apenas ao próximo termo
+    # contem: transforma em more like this aceita nao ()
+    # parecido: transforma em slop(20 não ordenado) 
+    # igual: transforma em slop(1 ordenado) 
+    # identico: transforma em slop(0 ordenado) 
     # more_like_this transforma os critérios em more like this se não existirem critérios apenas do brs
     # no more_like_this os critérios not serão levados em consideração na construção
-    def __init__(self, criterios_brs, more_like_this = False, campo_texto = 'texto'):
-        self.more_like_this = more_like_this
-        self.criterios_brs_inicial = str(criterios_brs)
+    RE_CONTEM = re.compile('^cont[eé]m:', re.IGNORECASE)
+    RE_INTELIGENTE = re.compile('^(adj\d*|prox\d*|cont[ée]m):', re.IGNORECASE)
+    RE_NAO = re.compile(r'\s+n[aã]o\s*\([^\)]+\)')
+    RE_NAO_LIMPAR = re.compile(r'(\s+n[aã]o\s*\()|(\()|(\))')
+    def __init__(self, criterios_originais,  campo_texto = 'texto'):
+        self.pesquisa_inteligente = self.RE_INTELIGENTE.match(criterios_originais)
+        self.criterios_originais = str(criterios_originais)
         self.contem_operadores_brs = False
         self.contem_operadores = False
         self.campo_texto = str(campo_texto)
-        # transforma os critérios agrupados em lista e sublistas de critérios
-        _criterios = self.converter_parenteses_para_listas(self.criterios_brs_inicial)
-        _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
-        # unindo os termos entre aspas agrupando entre parênteses e ADJ1
-        _criterios = self.juntar_aspas(_criterios)
-        # agrupando os critérios em parênteses próprios
-        _criterios = self.corrigir_criterios_e_reagrupar(_criterios)
-        _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
-        # corrige regras de operadores 
-        _criterios = self.corrigir_lista_de_operadores(_criterios)
-        _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
-        # pode ser mostrado na interface do usuário como a classe interpretou os critérios
-        self.criterios_brs_listas = _criterios
-        self.criterios_brs_reformatado = self.reformatar_criterios(self.criterios_brs_listas)
-        # critérios elastic pesquisa normal e highlight
-        self.criterios_elastic = self.as_query()
+        self.criterios_listas = []
+        if self.pesquisa_inteligente:
+            self.executar_pesquisa_inteligente()
+        else:
+            # transforma os critérios agrupados em lista e sublistas de critérios
+            _criterios = self.converter_parenteses_para_listas(self.criterios_originais)
+            _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
+            # unindo os termos entre aspas agrupando entre parênteses e ADJ1
+            _criterios = self.juntar_aspas(_criterios)
+            # formata os termos e operadores e quebrar tokens 
+            _criterios = Operadores.formatar_tokens(_criterios)
+            # agrupando os critérios em parênteses próprios
+            _criterios = self.corrigir_criterios_e_reagrupar(_criterios)
+            _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
+            # corrige regras de operadores 
+            _criterios = self.corrigir_lista_de_operadores(_criterios)
+            _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
+            # pode ser mostrado na interface do usuário como a classe interpretou os critérios
+            self.criterios_listas = _criterios
+            self.criterios_reformatado = self.reformatar_criterios(self.criterios_listas)
+            # critérios elastic pesquisa normal
+            self.criterios_elastic = self.as_query()
+        # cria a query com o highlight
         self.criterios_elastic_highlight = deepcopy(self.criterios_elastic)
         self.criterios_elastic_highlight['highlight'] = {"type" : "plain", "fields": {   f"{campo_texto}": {}   }}
         self.criterios_elastic_highlight['_source'] = [""]
-
-    @classmethod
-    def remover_acentos(self, txt):
-        return normalize('NFKD', txt).encode('ASCII', 'ignore').decode('ASCII')
 
     # recebe a primeira forma RAW escrita pelo usuário e converte em sublistas cada grupo de parênteses
     # cria lsitas de listas dentro dos parênteses
@@ -430,7 +568,7 @@ class PesquisaElasticFacil():
 
     # caso seja uma lista de uma única sublista, remove um nível 
     def corrigir_sublistas_desnecessarias(self,criterios_lista):
-        if TESTE_DEBUG: print(f'Sublistas: {criterios_lista}')
+        #if TESTE_DEBUG: print(f'Sublistas: {criterios_lista}')
         res = []
         for token in criterios_lista:
             if type(token) is list:
@@ -499,7 +637,7 @@ class PesquisaElasticFacil():
                 aspas_txt += f' {tk}'
             # token sem aspas
             elif tk:
-                res.append( Operadores.formatar_operador(tk) )
+                res.append( tk )
         # última aspas
         if aspas_txt:
             _novos_tokens = self.quebra_aspas_adj1(aspas_txt.strip())
@@ -557,10 +695,7 @@ class PesquisaElasticFacil():
     # min_doc_freq=1       -> menor frequência do termo em documentos para ele ser usado na pesquisa
     # max_query_terms=None -> maior número de termos usados na pesquisa (none é automático 30)
     # minimum_should_match=None -> quantidade de termos que precisam ser encontrados (none é automático entre 30% e 80% dependendo da qtd de termos)
-    def converter_brs_elastic_more_like_this(self, criterios, campos_texto, min_term_freq=1,min_doc_freq=1, max_query_terms=None, minimum_should_match=None ):
-        criterios, criterios_not = self.separar_criterios_not(criterios)
-        criterios = [_.replace("'",'').replace('"','') for _ in criterios if not Operadores.e_operador(_)]
-        criterios_not = [_.replace("'",'').replace('"','') for _ in criterios_not if not Operadores.e_operador(_)]
+    def as_query_more_like_this(self, criterios, criterios_nao, campos_texto, min_term_freq=1,min_doc_freq=1, max_query_terms=None, minimum_should_match=None ):
         _campos = [campos_texto] if type(campos_texto) is str else list(campos_texto)
         _max_query_terms = max_query_terms if max_query_terms else 30
         if minimum_should_match:
@@ -574,30 +709,26 @@ class PesquisaElasticFacil():
               _minimum_should_match = "50%" 
         return { "query": {"more_like_this" : {
                     "fields" : _campos,
-                    "like" : " ".join(criterios),
-                    "unlike" : " ".join(criterios_not),
+                    "like" : str(criterios),
+                    "unlike" : criterios_nao,
                     "min_term_freq" : min_term_freq,
                     "min_doc_freq" : min_doc_freq,
                     "max_query_terms" : _max_query_terms,
                     "minimum_should_match" : _minimum_should_match}}}
 
-
     def __str__(self) -> str:
-        return f'PesquisaElasticFacil: {self.criterios_brs_reformatado}'
+        return f'PesquisaElasticFacil: {self.criterios_reformatado}'
 
     def as_string(self):
-        return str(self.criterios_brs_reformatado)
+        return str(self.criterios_reformatado)
 
     #############################################################
     #############################################################
     # formatadores de query elastic
     #------------------------------------------------------------
     def as_query(self):
-        if self.more_like_this:
-           return self.converter_brs_elastic_more_like_this(self.criterios_brs_listas, self.campo_texto)
-
         #print('as_query: ', self.criterios_brs_listas)
-        res = self.as_query_condicoes(self.criterios_brs_listas)
+        res = self.as_query_condicoes(self.criterios_listas)
         # dependendo dos retornos, constrói queries específicas
         return { "query": res}
 
@@ -628,6 +759,7 @@ class PesquisaElasticFacil():
         operador_nao = False
         # busca o primeiro operador para análise do grupo
         operador_grupo, n_grupo = Operadores.operador_n_do_grupo(grupo)
+        if TESTE_DEBUG: print('Operador do grupo: ', operador_grupo, grupo)
         for token in grupo:
             # se for o operador não/not - apenas guarda a referência
             if type(token) is str and Operadores.e_operador_nao(token):
@@ -648,10 +780,10 @@ class PesquisaElasticFacil():
                 # verifica o tipo do grupo e monta o operador do termo
                 if operador_nao:
                     # não com termo é um must_not simples
-                    grupo_convertido = self.as_query_operador(token, Operadores.OPERADOR_PADRAO)
+                    grupo_convertido = self.as_query_operador(token, Operadores.OPERADOR_PADRAO, self.campo_texto)
                     must_not.append( grupo_convertido )
                 else:
-                    grupo_convertido = self.as_query_operador(token, operador_grupo)
+                    grupo_convertido = self.as_query_operador(token, operador_grupo, self.campo_texto)
                     if Operadores.e_operador_slop(operador_grupo):
                         span_near.append( grupo_convertido )
                     elif Operadores.e_operador_ou(operador_grupo):
@@ -665,51 +797,138 @@ class PesquisaElasticFacil():
             span_near = {'clauses' : span_near,
                          'slop' : max(0, n_grupo -1 ),
                          'in_order' : bool(Operadores.e_operador_adj(operador_grupo))}
-        #    print('Span_near: ', span_near )
-        #if any(must):
-        #    print('Must: ', must )
-        #if any(must_not):
-        #    print('Must_not: ', must_not )
-        #if any(should):
-        #    print('Should: ', should )
+        if TESTE_DEBUG:
+            if any(must): print('Must: ', must )
+            if any(must_not): print('Must_not: ', must_not )
+            if any(should): print('Should: ', should )
+            if any(span_near): print('Span_near: ', span_near )
         return self.as_bool_must(must = must, must_not = must_not, should=should, span_near=span_near)
 
-    def as_query_operador(self, token, operador_grupo):
+    @classmethod
+    def as_query_operador(self, token, operador_grupo, campo_texto = None):
+        token = token.lower()
         # wildcard - se o termo for entre aspas vira regex do próprio termo
-        _wildcard = token.find('*')>=0 or token.find('"')>=0 or token.find("'")>=0
-        _regex = token.find('?')>=0
-        _token = self.remover_acentos(token)
+        _aspas = token.find('"')>=0 or token.find("'")>=0
+        _wildcard = token.find('*')>=0 or _aspas
+        _regex = token.find('?')>=0 or Operadores.RE_TERMO_NUMERICO.match(token)
+        _token = Operadores.remover_acentos(token)
         _token = _token.replace("'",'').replace('"','')
-        if _wildcard:
-            _wildcard = { "wildcard": {f"{self.campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
+        if _wildcard and not _regex:
+            _wildcard = { "wildcard": {f"{campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
             if Operadores.e_operador_slop(operador_grupo):
                 return { "span_multi" : { "match": _wildcard } } 
             return _wildcard 
-        if _regex:
-            _token = Operadores.token_regex_interroga(_token)
-            _regex = { "regexp": {f"{self.campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
+        elif _regex or _aspas:
+            _token = Operadores.termo_regex_interroga(_token)
+            _regex = { "regexp": {f"{campo_texto}" : {"case_insensitive": True, "value": f"{_token}" } } }
             if Operadores.e_operador_slop(operador_grupo):
                 return { "span_multi" : { "match": _regex } } 
             return _regex 
         # termo simples
         if Operadores.e_operador_slop(operador_grupo):
-            return { "span_term": { f"{self.campo_texto}": f"{_token}" } }
-        return { "term": { f"{self.campo_texto}": f"{_token}" } }
+            return { "span_term": { f"{campo_texto}": f"{_token}" } }
+        return { "term": { f"{campo_texto}": f"{_token}" } }
+
+    # contem: transforma em more like this aceita nao ()
+    # parecido: transforma em slop(20 não ordenado) 
+    # igual: transforma em slop(1 ordenado) 
+    # identico: transforma em slop(0 ordenado) 
+    def executar_pesquisa_inteligente(self):
+        _tipo = self.RE_INTELIGENTE.findall(self.criterios_originais)[0]
+        _criterios = self.RE_INTELIGENTE.sub('', self.criterios_originais)
+        _criterios_nao = self.RE_NAO.findall(_criterios)
+        _criterios = self.RE_NAO.sub(' ', _criterios)
+        _criterios = Operadores.remover_acentos(_criterios.lower())
+        _criterios = Operadores.RE_LIMPAR_TERMO_MLT.sub(' ', _criterios).replace('$','*')
+        _criterios_nao = [self.RE_NAO_LIMPAR.sub(' ',Operadores.remover_acentos(_.lower())) for _ in _criterios_nao]
+        _tipo = _tipo.upper()
+        _criterios_nao_formatados = [f' NÃO ({_}) ' for _ in _criterios_nao]
+        _criterios_nao_formatados = ''.join(_criterios_nao_formatados)
+        self.criterios_reformatado = f'{_tipo}: {_criterios} {_criterios_nao_formatados}'
+        if TESTE_DEBUG:
+            print('Tipo: ', _tipo)
+            print('Critérios: ', _criterios)
+            print('Critérios não: ', _criterios_nao)
+            print('Critérios finais: ', _criterios)
+        if _tipo in ('CONTÉM', 'CONTEM'):
+            self.criterios_elastic = self.as_query_more_like_this(criterios=_criterios, 
+                                                                    criterios_nao=_criterios_nao, 
+                                                                    campos_texto=self.campo_texto) 
+        else: # contém
+            operador, n = Operadores.get_operador_n(_tipo)
+            if Operadores.e_operador_adj(operador):
+                ordem = True
+            else:
+                ordem = False
+            distancia = n-1
+            _criterios = [_ for _ in _criterios.split(' ') if _]
+            _criterios_nao = ' '.join(_criterios_nao)
+            _criterios_nao = [_ for _ in _criterios_nao.split(' ') if _]
+            self.criterios_elastic = self.as_query_slop(criterios=_criterios, 
+                                                        criterios_nao=_criterios_nao, 
+                                                        campos_texto=self.campo_texto,
+                                                        distancia = distancia,
+                                                        ordem = ordem)  
+
+    def as_query_slop(self, criterios, criterios_nao, campos_texto, distancia, ordem):
+        if type(campos_texto) is str:
+            _campo = campos_texto 
+        else:
+            _campo = list(campos_texto)[0] if any(campos_texto) else 'texto'
+        span_near = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo) for _ in criterios]
+        span_near_nao = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo) for _ in criterios_nao]
+        qspan_near = {'clauses' : span_near, 'slop' : max(0, distancia), 'in_order' : ordem}
+        qspan_near_nao = {'clauses' : span_near_nao, 'slop' : max(0, distancia), 'in_order' : ordem}
+
+        if not any(span_near_nao):
+           return { "query": {"span_near" :qspan_near }}
+        return { "query": { "bool": { 
+                  "must": [{"span_near" :qspan_near } ] ,
+                  "must_not" : [{"span_near" :qspan_near_nao }]} }
+                  }
 
 class PesquisaElasticFacilTeste():
     def __init__(self):
+        # testes de curingas
+        for i, teste in enumerate(TESTES_CURINGAS):
+            token, esperado = teste
+            saida1 = Operadores.formatar_token(token)
+            saida2 = Operadores.termo_regex_interroga(saida1)
+            if esperado != saida2:
+                msg = f'TESTE PesquisaElasticFacil - TOKENS: \nCritério ({i}):\n- Entrada:  {token}\n- Saída1:   {saida1}\n- Saída2:   {saida2}\n- Esperado: {esperado}\n'
+                raise Exception(msg)
+        # testes de operadores
+        for i, teste in enumerate(TESTES_OPERADORES):
+            token, operador, chave1, esperado = teste
+            saida1 = Operadores.formatar_token(token)
+            saida2 = PesquisaElasticFacil.as_query_operador(saida1,operador.upper(),'texto')
+            _teste_json = json.dumps(saida2)
+            _teste_chave1 = chave1 in saida2 # testa a primeira chave
+            _teste = saida2.get('span_multi',{}).get('match',{}).get('wildcard',{}).get('texto',{})
+            if not any(_teste): _teste = saida2.get('span_multi',{}).get('match',{}).get('regexp',{}).get('texto',{})
+            if not any(_teste): _teste = saida2.get('span_term',{}).get('texto',{})
+            if not any(_teste): _teste = saida2.get('term',{}).get('texto',{})
+            if not any(_teste): _teste = saida2.get('regexp',{}).get('texto',{})
+            saida2 = ''
+            if any(_teste):
+                saida2 = ','.join([str(_).lower() for _ in sorted(_teste.items())])
+            if esperado != saida2 or not _teste_chave1:
+                if not _teste_chave1: saida2 = f'chave {chave1} não encontrada'
+                msg = f'TESTE PesquisaElasticFacil - OPERADOR: \nCritério ({i}):\n- Entrada:  {token}\n- Saída1:   {saida1}\n- Saída2:   {saida2}\n- Json:   {_teste_json}\n- Esperado: {esperado}\n'
+                raise Exception(msg)
         # testes de tradução
         _testes = TESTES + TESTES_ENTRADA_FALHA
         pos_falhas = len(TESTES)                
         for i, teste in enumerate(_testes):
-            criterio,resultado = teste 
+            criterio,esperado = teste 
             pbe = PesquisaElasticFacil(criterio)
-            saida = pbe.criterios_brs_reformatado
-            if resultado != saida:
+            saida = pbe.criterios_reformatado
+            if esperado != saida:
                 _falha = ' - GRUPO DE FALHAS CORRIGIDAS' if i>=pos_falhas else ''
                 _i = i - pos_falhas if i>=pos_falhas else i
-                msg = f'TESTE PesquisaElasticFacil{_falha}: \nCritério ({_i}{_falha}):\n- Entrada: {criterio}\n- Saída:   {saida}\n- Esperado:   {resultado}\n- Lista:      {pbe.criterios_brs_listas}\n'
+                msg = f'TESTE PesquisaElasticFacil{_falha}: \nCritério ({_i}{_falha}):\n- Entrada:  {criterio}\n- Saída:    {saida}\n- Esperado: {esperado}\n- Lista:      {pbe.criterios_listas}\n'
                 raise Exception(msg)
+
 
 if __name__ == "__main__":
     TESTE_DEBUG = True
@@ -722,21 +941,23 @@ if __name__ == "__main__":
         teste = '("dano moral" e dano prox10 material prox15 estético) não Indenização'
         teste = 'dan????o prox10 moral??? prox210 ??material'
         teste = 'dano e ou adj5 (adj5) prox5 e moRal'
-        teste = 'dano? prox5 mora? dano adj20 material estetic??'
+        teste = 'a123456,??  dano? prox5 mora? dano adj20 material estetic??'
+        teste = '25/06/1976 (123,456.789-00 e 25:06:1976)'
+        teste = 'inss aposentadoria NÃO (administrativamente ou administrativa)'
         pbe = PesquisaElasticFacil(teste)
         print('Original : ', teste.strip())
-        print('Critérios: ', pbe.criterios_brs_reformatado)
-        print('Listas   : ', pbe.criterios_brs_listas)
+        print('Critérios: ', pbe.criterios_reformatado)
+        print('Listas   : ', pbe.criterios_listas)
         print('AsString: ', pbe.as_string())
         print('AsQuery: ', json.dumps(pbe.criterios_elastic_highlight) )
 
     def teste_mlt():
         print('--------------------------------------')
-        teste = 'dano adj2 "moral" "dano" prox10 "moral" prox5 material mora*'
-        pbe = PesquisaElasticFacil(teste,more_like_this=True)
+        teste = 'adj10: dano  "moral" "dano"  "moral" material mora* nao (presumido estético)'
+        pbe = PesquisaElasticFacil(teste)
         print('Original : ', teste.strip())
-        print('Critérios: ', pbe.criterios_brs_reformatado)
-        print('Listas   : ', pbe.criterios_brs_listas)
+        print('Critérios: ', pbe.criterios_reformatado)
+        print('Listas   : ', pbe.criterios_listas)
         print('AsString: ', pbe.as_string())
         print('AsQuery: ', json.dumps(pbe.criterios_elastic_highlight) )
 
