@@ -1,5 +1,4 @@
-# PesquisaElasticFacil
-
+# PesquisaElasticFacil 
 Componente python que simplifica a construção de queries no ElasticSearch e permite o uso dos operadores de proximidade de termos, comuns no BRS, em queries internas do ElasticSearch. Não há intenção de competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios próximos no elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
 - Código do componente python: [`PesquisaElasticFacil`](src/util_pesquisaelastic_facil.py) `atualizado: 06/10/2021`
