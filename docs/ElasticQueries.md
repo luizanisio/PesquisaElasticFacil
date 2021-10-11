@@ -1,6 +1,6 @@
  Algumas queries de exemplo para pesquisas textuais e vetoriais. Essas estruturas são criadas automaticamente pela classe `PesquisaElasticFacil` como descrito no arquivo `README`.
 
-### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (200 dimensões nesse exemplo):
+### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (300 dimensões nesse exemplo):
 - o char_filter vai converter os símbolos `,` `.` `:` `/`  em `_` para facilitar a localização de números separados por símbolos diferentes no documento e na pesquisa.
 - o processamento do `PesquisaElasticFacil` vai fazer esse mesmo tratamento nos números informados nos critérios de pesquisa e substituir os símbolos por um regex `_?`, com isso a pesquisa vai encontrar números com a mesma estrutura com separadores diferentes. O processamento também inclui `_?` nos milhares caso o número não tenha separadores. Exemplo: `12345` vira `12_?345`.
 ```json
