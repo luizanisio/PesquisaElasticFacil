@@ -16,6 +16,8 @@ queryelastic = pbe.criterios_elastic_highlight
 
 - [`Serviço Exemplo`](docs/servico_exemplo.md) : um exemplo simples de como o componente pode ser utilizado, os códigos serão disponibilizados em breve pois estou trabalhando na parte de envio de arquivos para indexação e vetorização.
 
+### Similaridade semântica
+Combinando pesquisa textual com operadores simplificados ao poder de busca vetorial do ElasticSearch podemos ter um sistema avançado que consegue localizar em poucos segundos textos semelhantes a um texto paradigma ou textos que contenham determinados critérios refinados. Bem como unir a pesquisa vetorial à pesquisa textual avançada. É uma ferramenta poderosa para busca em documentos acadêmicos, jurídicos etc. Permitindo agrupamento e monitoramento de novos documentos.
 
 ## Operadores:
 <ul>
@@ -32,12 +34,12 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
 
 ## Regras:
  - o elastic trabalha com grupos. Operadores diferentes não podem ser agrupados.
- - como operadores diferentes não podem ser agrupados, não é possível usar PROX ou ADJ antes ou depois de parênteses
+ - como operadores diferentes não podem ser agrupados, não é possível usar `PROX` ou `ADJ` antes ou depois de parênteses
  - operadores `PROX` e `ADJ` antes ou depois de parênteses serão transformados em `E`
  - o `NÃO` antes de um termo afeta apenas o termo por ele seguido: `"dano moral" não material`
  - o `NÃO` antes de um grupo afeta todo o grupo: `"dano moral" não (material e prejuízo)`
  - se nos critérios tiver `ADJ` e depois `PROX` ou vice-versa, os termos entre eles serão duplicados para cada grupo ex.: `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 prox10 termo2) E (termo2 ADJ3 termo3)`
- - o elastic trabalha com proximidade (SLOP) sequencial (como o ADJ) ou não sequencial (como o PROX) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado.
+ - o elastic trabalha com proximidade (SLOP) sequencial (como o `ADJ`) ou não sequencial (como o `PROX`) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado.
  
 ### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
  - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)` ==> dois grupos foram criados
@@ -49,22 +51,22 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
  - São aceitos os curingas em qualquer posição do termo:
    - `*` ou `$` para qualquer quantidade de caracteres: `dano*` pode retornar `dano`, `danos`, `danosos`, etc.
    - `?` para 0 ou um caracter: `dano?` pode retornar `dano` ou `danos`.
-   - `?` para 0, 1 ou 2 caracteres: `??ativo` pode retornar `ativo`, `inativo`, `reativo`, etc.
+   - `??` para 0, 1 ou 2 caracteres: `??ativo` pode retornar `ativo`, `inativo`, `reativo`, etc.
    - `??` para 0 caracteres ou quandos `?` forem colocados: `dan??` pode retornar `dano`,`danos`,`dani`,`danas`,`dan`, etc.
  - Exemplo de erro causado com um curinga no termo `dan????`. Uma sugestão seria usar menos curingas como `dan??`.
  - ERRO: `"caused_by" : {"type" : "runtime_exception","reason" : "[texto:/dan.{0,4}o/ ] exceeds maxClauseCount [ Boolean maxClauseCount is set to 1024]"}`
  - contornando o erro:
-   - deve-se controlar esse erro e sugerir ao usuário substituir <b>*</b> por um conjunto de <b>?</b>, ou reduzir o número de <b>?</b> que possam retornar muitos termos, principalmente em termos comuns e pequenos
+   - deve-se controlar esse erro e sugerir ao usuário substituir `*` por um conjunto de `?`, ou reduzir o número de `?` que possam retornar muitos termos, principalmente em termos comuns e pequenos
  - Exemplos de conversões de curingas para o ElasticSearch:
    - `estetic??` --> `{"regexp": {"texto": {"case_insensitive": true, "value": "estetic.{0,2}"}}}]}}`
    - `??ativ?` --> `{"regexp": {"texto": {"case_insensitive": true, "value": ".{0,2}ativ.{0,1}"}}}]}}`
    - `mora*` ou `mora$` --> `{"wildcard": {"texto": {"case_insensitive": true, "value": "mora*"}}}`
 
 ## Aspas:
- - Os termos entre aspas serão pesquisados da forma que estiverem escritos. Mas para isso o índice do elastic tem que ter um campo ou subcampo com os critérios sem dicionário.
+ - Os termos entre aspas serão pesquisados da forma que estiverem escritos. Mas para isso o índice do elastic tem que ter subcampo mapeado com os critérios sem dicionário - exemplo campo `texto` e `texto.raw`.
  - Um grupo de termos entre aspas será tratado como distância 1, ou seja `ADJ1` (`SLOP 0` no Elastic).
    - Exemplo: `"dano moral` ==> `"dano" ADJ1 "moral"`
- - Por limitação do tratamento de sinônimos do ElasticSearch, grupos com termos entre ADJ e PROX são considerados todos entre aspas ou todos sem aspas. Sendo assim, ao colocar aspas em um termo do conjunto, todos os termos serão considerados entre aspas. Isso ocorre pois todos os termos serão pesquisados em um campo indexado sem sinônimos (ex. `texto.raw`).
+ - Por limitação do tratamento de sinônimos do ElasticSearch, grupos com termos entre `ADJ` e `PROX` são considerados todos entre aspas ou todos sem aspas. Sendo assim, ao colocar aspas em um termo do conjunto, todos os termos serão considerados entre aspas/literais. Isso ocorre pois todos os termos serão pesquisados em um campo indexado sem sinônimos (ex. `texto.raw`).
    - Exemplo: `"dano" adj1 "moral" adj1 estético` ==> `"dano" ADJ1 "moral" ADJ1 "estético"`
  - Veja mais detalhes sobre o uso de sinônimos aqui: [`ElasticSinonimos`](/docs/ElasticSinonimos.md)
 
@@ -80,6 +82,7 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
    - `ADJ2: aposentadoria pelo inss nao (professor professora invalidez)`
    - `PROX10: aposentadoria inss complementar professor`
    - `contém: aposentadoria inss pensao nao (complementar invalidez)`
+   > :bulb: Nota: caso o analisador identifique que os critérios de pesquisa na verdade são um texto (contendo pontuações, nenhum operador especial, etc), ele vai fazer a pesquisa como `contém:` automaticamente. Pode-se desativar essa avaliação iniciando o texto dos critérios por `:`. Essa análise permite que o usuário copie e cole um trecho de algum documento e clique em pesquisar sem se preocupar em definir o tipo de pesquisa.
  
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
