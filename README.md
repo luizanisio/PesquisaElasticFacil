@@ -54,8 +54,10 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
  - Vou incluir uma página com exemplos de uso desses critérios.
  - Pesquisas de campo não podem ser comparadas com pesquisas simples. O uso de `NÃO` é liberado, mas o uso do `OU` tem algumas ressalvas.
    - `NÃO` antes do grupo, ex. `NAO .idade.(>15) NAO .tipo.(comentario)` cria as condições negativas para `idade>15` e para `tipo=comentario`
-   - `OU` antes do grupo: `(artigo científico) OU .tipo.(artigo ou revista) .data.(> 2021-01-01) OU .autor.(skinner)`
-     - Esse exemplo pesquisa os documento do tipo artigo ou revista ou do autor Skinner, com data maior que "2021-01-01" e que contenham os termos "artigo" e "científico". Mesmo os grupos com `OU` estando separados, eles são analisados em conjunto, precisando que pelo menos um dos critérios `OU` seja atendido.
+   - `OU` antes do grupo: `(psicologia clínica) OU .tipo.(artigo ou revista) .data.(> 2021-01-01) OU .autor.(skinner)`
+     - Esse exemplo pesquisa os documento do tipo artigo ou revista ou do autor Skinner, com data maior que "2021-01-01" e que contenham os termos "psicologia" e "clínica". Mesmo os grupos com `OU` estando separados, eles são analisados em conjunto, precisando que pelo menos um dos critérios `OU` seja atendido.
+ - Não é permitido colocar critérios de campos dentro de parênteses: `psicologia ADJ5 clínica ( .autor.(skinner) e .tipo.(artigo) )`, pode-se escrever assim: `psicologia ADJ5 clínica  .autor.(skinner) e .tipo.(artigo) `
+ > 💡 <sub>Nota: Internamente cada grupo será tratado como uma `PesquisaElasticFacil` com todas as suas regras, a diferença é a aplicação em campos diferentes para cada conjunto de critério.</sub>
 
 ### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
  - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)` ==> dois grupos foram criados
@@ -98,7 +100,7 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
    - `ADJ2: aposentadoria pelo inss nao (professor professora invalidez)`
    - `PROX10: aposentadoria inss complementar professor`
    - `contém: aposentadoria inss pensao nao (complementar invalidez)`
-   > :bulb: Nota: caso o analisador identifique que os critérios de pesquisa na verdade são um texto (contendo pontuações, nenhum operador especial, etc), ele vai fazer a pesquisa como `contém:` automaticamente. Pode-se desativar essa avaliação iniciando o texto dos critérios por `:`. Essa análise permite que o usuário copie e cole um trecho de algum documento e clique em pesquisar sem se preocupar em definir o tipo de pesquisa.
+   > :bulb: <sub>Nota: caso o analisador identifique que os critérios de pesquisa na verdade são um texto (contendo pontuações, nenhum operador especial, etc), ele vai fazer a pesquisa como `contém:` automaticamente. Pode-se desativar essa avaliação iniciando o texto dos critérios por `:`. Essa análise permite que o usuário copie e cole um trecho de algum documento e clique em pesquisar sem se preocupar em definir o tipo de pesquisa.</sub>
  
 ## Correções automáticas 
  - Alguns erros de construção das queries serão corrigidos automaticamente
