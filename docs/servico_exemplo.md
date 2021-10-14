@@ -9,6 +9,9 @@
 #### Painel com dicas de como usar pesquisas inteligentes
 ![Painel com dicas dos operadores inteligentes](img001_tela_dicas.png?raw=true "Title")
 
+#### Painel com dicas de como usar pesquisas por campos e grupos de pesquisas
+![Painel com dicas dos operadores inteligentes](img002_tela_dicas.png?raw=true "Title")
+
 #### Menu com exemplos prontos para ilustrar o uso dos operadores
 ![Menu com exemplos prontos](img001_tela_lista_exemplos.png?raw=true "Title")
 
