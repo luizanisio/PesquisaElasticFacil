@@ -25,18 +25,28 @@
 # Ver 0.1.3 - 06/10/2021 - correção termo único na pesquisa, correção de aspas simples e inclusão de mais testes
 # Ver 0.1.4 - 06/10/2021 - correção slop 
 # Ver 0.1.5 - 06/10/2021 - termos entre aspas usa o campo_texto_raw para todos do slop
+# Ver 0.1.6 - 07/10/2021 - campo raw é um sufixo no campo principal (o mapeamento no elastic normalmente é assim)
+#                        - Grupos de pesquisas e campos disponíveis GruposPesquisaElasticFacil
+#                        - Pesquisa CONTÉM automática com textos grandes copiados (>100 caracters com artigos e símbolos)
+# Ver 0.2.0 - 14/10/2021 - Grupos de pesquisas e campos disponíveis GruposPesquisaElasticFacil
+#                        - Otimizações e correções
+#                        - mensagens e alertas para apresentação ao usuário
 #
 # TODO: 
-# - inclusão de grupos de pesquisa
 # - criar testes para queries do Elastic transformadas
-# - sinônimos - aspas em todo o grupo slop - com aspas usa campo raw para o grupo slop
-# - retornar uma lista de warnings com transformações corrigidas automaticamente
  
 import re
-from types import ClassMethodDescriptorType
 from unicodedata import normalize
 import json
 from copy import deepcopy
+
+CRITERIO_CAMPO_HIGHLIGHT = {"require_field_match": False,"max_analyzed_offset": 1000000}
+ERRO_PARENTESES_FALTA_FECHAR = 'Parênteses incompletos nos critérios de pesquisa - falta fechamento de parênteses.'
+ERRO_PARENTESES_FECHOU_MAIS = 'Parênteses incompletos nos critérios de pesquisa - há fechamento excedente de parênteses.'
+ERRO_OPERADOR_CAMPO_PESQUISA = 'campos_pesquisa: Não são aceitos operadores de campo em pesquisas simples.'
+ERRO_OPERADOR_CAMPO_PARENTESES = 'campos_pesquisa: Não são aceitos operadores de campo dentro de parênteses.'
+ERRO_PARENTESES_CAMPO = 'Não são aceitos operadores de campo dentro de parênteses.'
+ERRO_OPERADOR_OU_CAMPO_RAIZ = 'Não são aceitos operadores OU entre critérios de grupo e critérios simples'
 
 TESTES = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
            ('"dano moral','"dano" ADJ1 "moral"'),
@@ -86,6 +96,7 @@ TESTES_ENTRADA_FALHA = (
            ('nao (termo1) nao ADJ1 (termo2)','NAO (termo1 ADJ1 termo2)'),
            ('a123456,??  dano? prox5 mora? dano adj20 material estetic??','a123456 E (dano? PROX5 mora?) E (dano ADJ20 material) E estetic??'),
            ('2020','2020'),('(2020)','2020'),("'2020'",'"2020"'),
+           ('"dano - moral"','"dano" ADJ1 "moral"'),
         )
 
 TESTES_CURINGAS = (
@@ -117,31 +128,36 @@ TESTES_OPERADORES = (
 )
 
 
-TESTE_DEBUG = False
+PRINT_DEBUG = False
+PRINT_WARNING = True
 
 ###########################################################
 # Controla o uso de operadores válidos nas pesquisas, 
 # diferenciando os operadores dos termos de pesquisa 
 #----------------------------------------------------------
 class Operadores():
-    RE_TOKEN_CRITERIOS = re.compile(r'(adjc?\d*|proxc?\d*|com)',re.IGNORECASE)
-    RE_TOKEN_CRITERIOS_AGRUPAMENTO = re.compile(r'(adjc?\d*|proxc?\d*|ou)',re.IGNORECASE)
-    RE_TOKEN_ADJ = re.compile(r'adjc?\d*',re.IGNORECASE)
-    RE_TOKEN_PROX = re.compile(r'proxc?\d*',re.IGNORECASE)
-    RE_TOKEN_COM = re.compile(r'com?\d*',re.IGNORECASE)
+    RE_TOKEN_CRITERIOS = re.compile(r'(adjc?\d*|proxc?\d*|com)$',re.IGNORECASE)
+    RE_TOKEN_CRITERIOS_AGRUPAMENTO = re.compile(r'(adjc?\d*|proxc?\d*|ou)$',re.IGNORECASE)
+    RE_TOKEN_ADJ = re.compile(r'adjc?\d*$',re.IGNORECASE)
+    RE_TOKEN_PROX = re.compile(r'proxc?\d*$',re.IGNORECASE)
+    RE_TOKEN_COM = re.compile(r'com$',re.IGNORECASE)
     RE_TOKEN_N = re.compile(r'\d+')
     RE_TERMO_NUMERICO = re.compile(r'[\d\?\*][\d\:\?\*\.\,\-\_\/]*[\d\?\*]$') 
     RE_TERMO_MILHAS = re.compile(r'[\d\?\*][\d\?\*\.\,]*[\d\?\*]$') 
     RE_TERMO_SO_CURINGA = re.compile(r'[\?\*\_\$]+$') 
+    RE_TERMO_COM_CURINGA = re.compile(r'[\?\*\_\$]') 
     RE_TOKEN_QUEBRA_N = re.compile(r'[\d\.\-_\/\,\?\*\:]+$') # 123.233/2332-23,23 ou curingas - verifica se é um token numérico
     RE_TOKEN_QUEBRA_N_FORMAT = re.compile(r'[\.\-_\/\,\:]+') # 123.233/2332-23,23 ou curingas - corrige símbolos por _
-    RE_TOKEN_OU = re.compile(r'ou',re.IGNORECASE)
-    RE_TOKEN_E = re.compile(r'e',re.IGNORECASE)
+    RE_TOKEN_OU = re.compile(r'ou$',re.IGNORECASE)
+    RE_TOKEN_E = re.compile(r'e$',re.IGNORECASE)
     RE_TOKEN_INTERROGA = re.compile(r'([\?]+)')
     RE_TOKEN_ASTERISCO = re.compile(r'([\*\$]+)')
     RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"]') # o token já estará sem acentos
     RE_LIMPAR_TERMO_ASPAS = re.compile(f'( \")|(\" )') # o token já estará sem acentos
     RE_LIMPAR_TERMO_MLT = re.compile(f'[^A-Za-z\d]') # tokens limpos de pesquisa
+    #RE_OPERADOR_CAMPOS_GRUPOS = re.compile(r'(\.\w+\.\()|(\s+n[ãa]o\s*\.\w+\.\()|(\s+e\s*\.\w+\.\()|(\s+ou\s*\.\w+\.\()', re.IGNORECASE)
+    RE_OPERADOR_CAMPOS_GRUPOS = re.compile(r'(\.\w+\.\()', re.IGNORECASE)
+    RE_OPERADOR_RANGE = re.compile(r'>=|<=|>|<|lte|gte|lt|gt', re.IGNORECASE)
     OPERADOR_PADRAO = 'E'
     OPERADOR_ADJ1 = 'ADJ1'
     # retorna true se o token recebido é um critério conhecido
@@ -366,26 +382,31 @@ class Operadores():
     def remover_acentos(self, txt):
         return normalize('NFKD', txt).encode('ASCII', 'ignore').decode('ASCII')
 
+    # retorna o campo texto ou o campo texto com o sufico raw se existirem critérios entre aspas
+    # unico = True exige que mesmo existindo uma lista de campos, somento o primeiro seja retornado
+    # para resolver problemas de operadores que trabalham com um campo apenas
     @classmethod
-    def campo_texto_grupo(self, criterios, campo_texto, campo_texto_raw, unico = False):
+    def campo_texto_grupo(self, criterios, campo_texto, sufixo_campo_raw, unico = False):
         aspas = filter(lambda k:type(k) is str and k.find('"')>=0,criterios)
-        res = campo_texto_raw if any(aspas) and campo_texto_raw else campo_texto
-        if not unico:
+        if not any(aspas):
+            res = campo_texto
+        elif type(campo_texto) is str:
+            res = f'{campo_texto}{sufixo_campo_raw}'
+        else:
+            # coloca o sufixo em todos os campos
+            res = [f'{_}{sufixo_campo_raw}' for _ in campo_texto]
+        if (not unico) or (type(res) is str):
             return res 
-        if type(res) is str:
-            return res
         return list(res)[0] if any(res) else 'texto'
 
     @classmethod
-    def campo_texto_termo(self, termo, campo_texto, campo_texto_raw, unico = False):
-        aspas = type(termo) is str and termo.find('"')>=0
-        res = campo_texto_raw if aspas and campo_texto_raw else campo_texto
-        if not unico:
-            return res 
-        if type(res) is str:
-            return res
-        return list(res)[0] if any(res) else 'texto'
+    def campo_texto_termo(self, termo, campo_texto, sufixo_campo_raw, unico = False):
+        # o termo pode vir como string ou como uma sublista - ao colocar em uma lista, tem o mesmo comportamento de grupo
+        return self.campo_texto_grupo(criterios=[termo], campo_texto=campo_texto, sufixo_campo_raw=sufixo_campo_raw, unico=unico)
 
+    @classmethod
+    def contem_operador_agrupado(self, criterios):
+        return self.RE_OPERADOR_CAMPOS_GRUPOS.search(criterios)
 
 ###########################################################
 # Recebe um critério de pesquisa livre estilo BRS 
@@ -398,24 +419,56 @@ class PesquisaElasticFacil():
     # critérios prox e adj antes e depois de parênteses serão substituídos por E
     # termos seguidos sem eperadores serão considerados com o operador E entre eles
     # not sem parênteses será aplicado apenas ao próximo termo
-    # contem: transforma em more like this aceita nao ()
-    # parecido: transforma em slop(20 não ordenado) 
-    # igual: transforma em slop(1 ordenado) 
-    # identico: transforma em slop(0 ordenado) 
-    # more_like_this transforma os critérios em more like this se não existirem critérios apenas do brs
-    # no more_like_this os critérios not serão levados em consideração na construção
+    # contem: transforma em more like this - aceita NÃO (lista de termos)
+    # PROXn: transforma em slop(n não ordenado) - aceita NÃO (lista de termos)
+    # ADJn: transforma em slop(n ordenado) - aceita NÃO (lista de termos)
+    # o sufixo_campo_raw identifica o sufixo de campo para termos entre aspas
+    # e_subgrupo_pesquisa apenas identifica que está rodando a pesquisa de dentro de um grupo de campo para melhorar as mensagens de erro
     RE_CONTEM = re.compile('^cont[eé]m:', re.IGNORECASE)
     RE_INTELIGENTE = re.compile('^(adj\d*|prox\d*|cont[ée]m):', re.IGNORECASE)
+    RE_CONTEM_INTELIGENTE = re.compile(r'd?[aiou] |de|[ a-z],|[{}\[\]]|[a-z]:')
+    RE_NAO_CONTEM_INTELIGENTE = re.compile(r'\W(adj\d*|prox?\d*|com)\W',re.IGNORECASE)
     RE_NAO = re.compile(r'\s+n[aã]o\s*\([^\)]+\)')
     RE_NAO_LIMPAR = re.compile(r'(\s+n[aã]o\s*\()|(\()|(\))')
-    def __init__(self, criterios_originais,  campo_texto = 'texto', campo_texto_raw = None):
+    def __init__(self, criterios_originais,  campo_texto = 'texto', sufixo_campo_raw = None, e_subgrupo_pesquisa = False):
         self.pesquisa_inteligente = self.RE_INTELIGENTE.match(criterios_originais)
-        self.criterios_originais = str(criterios_originais)
+        self.criterios_originais = str(criterios_originais).strip()
         self.contem_operadores_brs = False
         self.contem_operadores = False
         self.campo_texto = str(campo_texto)
-        self.campo_texto_raw = self.campo_texto if not campo_texto_raw else campo_texto_raw
+        self.sufixo_campo_raw = '' if not sufixo_campo_raw else str(sufixo_campo_raw)
         self.criterios_listas = []
+        self.avisos = [] # registra sugestões de avisos para o usuário
+        # valida se a pesquisa contém operadores de campos pois não é aceito nessa classe
+        self.e_subgrupo_pesquisa = e_subgrupo_pesquisa
+        if Operadores.RE_OPERADOR_CAMPOS_GRUPOS.search(criterios_originais):
+            if self.e_subgrupo_pesquisa:
+               raise ValueError(ERRO_OPERADOR_CAMPO_PARENTESES)
+            else:
+               raise ValueError(ERRO_OPERADOR_CAMPO_PESQUISA)
+
+        # começar os critérios com : é um scape para essa análise automática
+        # mais de 50 de tamanho, não tem adj ou prox ou campo agrupado
+        # e com mais de um caracteres estranhos às pesquisas, considera "contém:""
+        if not self.pesquisa_inteligente and self.criterios_originais[:1] != ':' and \
+            len(self.criterios_originais) > 50:
+            _teste = Operadores.remover_acentos(self.criterios_originais).lower()
+            if Operadores.RE_TOKEN_ADJ.search(_teste) or \
+               Operadores.RE_TOKEN_PROX.search(_teste) or \
+               Operadores.RE_OPERADOR_CAMPOS_GRUPOS.search(_teste) or \
+                self.RE_NAO_CONTEM_INTELIGENTE.search(_teste):
+                pass
+            else:
+                qtd_quebrados = len(self.RE_CONTEM_INTELIGENTE.findall(_teste))
+                if (qtd_quebrados > 1):
+                    if PRINT_WARNING: print(f'Critério CONTÉM: inserido >> {len(self.criterios_originais)} caracteres e {qtd_quebrados} termos não pesquisáveis')
+                    self.pesquisa_inteligente = True
+                    self.criterios_originais = f'CONTÉM: {self.criterios_originais}'
+                    self.avisos.append('Critério "CONTÉM:" inserido automaticamente ao identificar o conteúdo como texto. Use ":" antes da pesquisa para desativá-lo.')
+
+        if self.criterios_originais[:1] == ':':
+             self.criterios_originais = self.criterios_originais[1:]
+        # realiza a construção das pesquisas
         if self.pesquisa_inteligente:
             self.executar_pesquisa_inteligente()
         else:
@@ -439,7 +492,7 @@ class PesquisaElasticFacil():
             self.criterios_elastic = self.as_query()
         # cria a query com o highlight
         self.criterios_elastic_highlight = deepcopy(self.criterios_elastic)
-        self.criterios_elastic_highlight['highlight'] = {"type" : "plain", "fields": {   f"{campo_texto}": {}   }}
+        self.criterios_elastic_highlight['highlight'] = {"type" : "plain", "fields": {   f"{campo_texto}": CRITERIO_CAMPO_HIGHLIGHT }}
         self.criterios_elastic_highlight['_source'] = [""]
 
     # recebe a primeira forma RAW escrita pelo usuário e converte em sublistas cada grupo de parênteses
@@ -447,6 +500,7 @@ class PesquisaElasticFacil():
     # exemplo:  ((teste1 teste2) e (teste3 teste4) teste5)
     #   vira :  [['teste1','teste2'], ['teste3', 'teste4'], 'teste5']
     def converter_parenteses_para_listas(self,criterios):
+        comp_msg = f' {ERRO_PARENTESES_CAMPO}' if self.e_subgrupo_pesquisa else ''
         """ baseado em https://stackoverflow.com/questions/23185540/turn-a-string-with-nested-parenthesis-into-a-nested-list-python """
         left = r'[(]'
         right=r'[)]'
@@ -463,12 +517,13 @@ class PesquisaElasticFacil():
             elif re.match(right, x):
                 stack.pop()
                 if not stack:
-                    raise ValueError('erro: abertura de parênteses faltando')
+                    raise ValueError(str(f'{ERRO_PARENTESES_FECHOU_MAIS}{comp_msg}'))
             else:
                 stack[-1].append(x)
         if len(stack) > 1:
-            print(stack)
-            raise ValueError('erro: fechamento de parênteses faltando')
+            print('criterios: ', criterios )
+            print('stack: ', stack)
+            raise ValueError(str(f'{ERRO_PARENTESES_FALTA_FECHAR}{comp_msg}'))
         return stack.pop()
 
     # agrupa OU pois é precedente dos critérios  
@@ -486,7 +541,7 @@ class PesquisaElasticFacil():
         res = []
         grupo = []
         grupo_operador = ''
-        if TESTE_DEBUG: print(f'Agrupar (recursivo {recursivo}): {criterios_lista}')
+        if PRINT_DEBUG: print(f'Agrupar (recursivo {recursivo}): {criterios_lista}')
         for i, token in enumerate(criterios_lista):
             operador_proximo = ''
             token_anterior = ''
@@ -515,7 +570,7 @@ class PesquisaElasticFacil():
                 res.append(grupo)
                 grupo_operador = ''
                 grupo = []
-                if TESTE_DEBUG: print(f' - quebra termo termo: {token_anterior} >> {token}')
+                if PRINT_DEBUG: print(f' - quebra termo termo: {token_anterior} >> {token}')
 
             # próximo é um operador mas não é de agrupamento, finaliza o agrupamento com o token
             if (not operador_proximo) and \
@@ -525,7 +580,7 @@ class PesquisaElasticFacil():
                 res.append(grupo)
                 grupo_operador = ''
                 grupo = []
-                if TESTE_DEBUG: print(f' - quebra termo termo: {token_anterior} >> {token}')
+                if PRINT_DEBUG: print(f' - quebra termo termo: {token_anterior} >> {token}')
             # o próximo operador é um operador agrupado, insere no grupo    
             elif operador_proximo:
                 # se o grupo estiver em uso e for de outro operador, finaliza o grupo
@@ -533,7 +588,7 @@ class PesquisaElasticFacil():
                     grupo.append(token)
                     res.append(grupo)
                     grupo=[ ]
-                    if TESTE_DEBUG: print(' - novo grupo outro operador: ',token, grupo_operador, '|', operador_proximo)
+                    if PRINT_DEBUG: print(' - novo grupo outro operador: ',token, grupo_operador, '|', operador_proximo)
                     # se for prox ou adj antes e depois, o token fica compartilhado nos dois grupos
                     if Operadores.e_operador_slop(operador_proximo) and \
                        Operadores.e_operador_slop(grupo_operador):
@@ -545,7 +600,7 @@ class PesquisaElasticFacil():
                     # agrupa
                     grupo.append(token)
                     grupo_operador = operador_proximo
-                    if TESTE_DEBUG: print(' - novo grupo: ',token, grupo_operador)
+                    if PRINT_DEBUG: print(' - novo grupo: ',token, grupo_operador)
             # se estiver agrupando, continua agrupando
             elif any(grupo):
                grupo.append(token)
@@ -565,7 +620,7 @@ class PesquisaElasticFacil():
     # remove sublistas encadeadas sem necessidade (((teste))) = (teste)
     def corrigir_lista_de_operadores(self,criterios_lista):
         res = []
-        if TESTE_DEBUG: print(f'Operadores: {criterios_lista}')
+        if PRINT_DEBUG: print(f'Operadores: {criterios_lista}')
         for i, token in enumerate(criterios_lista):
             token_anterior = ''
             token_proximo = ''
@@ -602,7 +657,7 @@ class PesquisaElasticFacil():
 
     # caso seja uma lista de uma única sublista, remove um nível 
     def corrigir_sublistas_desnecessarias(self,criterios_lista, raiz = True):
-        #if TESTE_DEBUG: print(f'Sublistas: {criterios_lista}')
+        #if PRINT_DEBUG: print(f'Sublistas: {criterios_lista}')
         res = []
         for token in criterios_lista:
             if type(token) is list:
@@ -623,7 +678,7 @@ class PesquisaElasticFacil():
             # se for uma lista, remove, se for raiz e for um token, mantém
             if type(res[0]) is list or not raiz:
                 res = res[0]
-        if TESTE_DEBUG: print(f' -- sublistas --->  : {res}')
+        if PRINT_DEBUG: print(f' -- sublistas --->  : {res}')
         return res 
 
     def quebra_aspas_adj1(self, texto):
@@ -631,7 +686,9 @@ class PesquisaElasticFacil():
         if not _texto:
             return []
         res = []
-        for _ in _texto.strip().split(' '):
+        # pega apenas os tokens que são válidos 
+        tokens = [_ for _ in  _texto.strip().split(' ') if Operadores.formatar_termo(_)]
+        for _ in tokens:
             res += [f'"{_}"', Operadores.OPERADOR_ADJ1]
         res = res[:-1]
         # se tiver apenas um item, retorna ele como string sem grupo
@@ -641,7 +698,7 @@ class PesquisaElasticFacil():
 
     # junta critérios entre aspas se existirem - espera receber uma lista de strings
     def juntar_aspas(self,criterios_lista):
-        if TESTE_DEBUG: print(f'Juntar aspas: {criterios_lista}')
+        if PRINT_DEBUG: print(f'Juntar aspas: {criterios_lista}')
         res = []
         aspas = False
         aspas_txt = '' #vai acrescentando os termos entre aspas
@@ -678,7 +735,7 @@ class PesquisaElasticFacil():
         if aspas_txt:
             _novos_tokens = self.quebra_aspas_adj1(aspas_txt.strip())
             res.append(_novos_tokens)
-        if TESTE_DEBUG: print(f' -- aspas ----> : {res}')
+        if PRINT_DEBUG: print(f' -- aspas ----> : {res}')
         return res 
 
     def reformatar_criterios(self, criterios_lista):
@@ -768,8 +825,8 @@ class PesquisaElasticFacil():
         operador_nao = False
         # busca o primeiro operador para análise do grupo
         operador_grupo, n_grupo = Operadores.operador_n_do_grupo(grupo)
-        _campo_texto_slop = Operadores.campo_texto_grupo(grupo, self.campo_texto, self.campo_texto_raw, unico = True)
-        if TESTE_DEBUG: print('Operador do grupo: ', operador_grupo, grupo)
+        _campo_texto_slop = Operadores.campo_texto_grupo(grupo, self.campo_texto, self.sufixo_campo_raw, unico = True)
+        if PRINT_DEBUG: print('Operador do grupo: ', operador_grupo, grupo)
         for token in grupo:
             # se for o operador não/not - apenas guarda a referência
             if type(token) is str and Operadores.e_operador_nao(token):
@@ -781,6 +838,8 @@ class PesquisaElasticFacil():
                 grupo_convertido = self.as_query_condicoes(token)
                 if operador_nao:
                     must_not.append( grupo_convertido)
+                elif Operadores.e_operador_ou(operador_grupo):
+                    should.append( grupo_convertido )
                 else:
                     must.append( grupo_convertido )
             elif Operadores.e_operador(token):
@@ -790,7 +849,7 @@ class PesquisaElasticFacil():
                 # verifica o tipo do grupo e monta o operador do termo
                 if operador_nao:
                     # não com termo é um must_not simples
-                    _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, campo_texto_raw=self.campo_texto_raw, unico=True)
+                    _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, sufixo_campo_raw=self.sufixo_campo_raw, unico=True)
                     grupo_convertido = self.as_query_operador(token, Operadores.OPERADOR_PADRAO, _campo_texto)
                     must_not.append( grupo_convertido )
                 else:
@@ -799,7 +858,7 @@ class PesquisaElasticFacil():
                     if Operadores.e_operador_slop(operador_grupo):
                         _campo_texto = _campo_texto_slop
                     else:
-                        _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, campo_texto_raw=self.campo_texto_raw, unico=True)
+                        _campo_texto = Operadores.campo_texto_termo(token, campo_texto=self.campo_texto, sufixo_campo_raw=self.sufixo_campo_raw, unico=True)
                     grupo_convertido = self.as_query_operador(token, operador_grupo, _campo_texto)
                     if Operadores.e_operador_slop(operador_grupo):
                         span_near.append( grupo_convertido )
@@ -814,7 +873,7 @@ class PesquisaElasticFacil():
             span_near = {'clauses' : span_near,
                          'slop' : max(0, n_grupo -1 ),
                          'in_order' : bool(Operadores.e_operador_adj(operador_grupo))}
-        if TESTE_DEBUG:
+        if PRINT_DEBUG:
             if any(must): print('Must: ', must )
             if any(must_not): print('Must_not: ', must_not )
             if any(should): print('Should: ', should )
@@ -862,7 +921,7 @@ class PesquisaElasticFacil():
         _criterios_nao_formatados = [f' NÃO ({_}) ' for _ in _criterios_nao]
         _criterios_nao_formatados = ''.join(_criterios_nao_formatados)
         self.criterios_reformatado = f'{_tipo}: {_criterios} {_criterios_nao_formatados}'
-        if TESTE_DEBUG:
+        if PRINT_DEBUG:
             print('Tipo: ', _tipo)
             print('Critérios: ', _criterios)
             print('Critérios não: ', _criterios_nao)
@@ -884,13 +943,13 @@ class PesquisaElasticFacil():
             self.criterios_elastic = self.as_query_slop(criterios=_criterios, 
                                                         criterios_nao=_criterios_nao, 
                                                         campos_texto=self.campo_texto,
-                                                        campos_texto_raw=self.campo_texto_raw,
+                                                        sufixo_campo_raw=self.sufixo_campo_raw,
                                                         distancia = distancia,
                                                         ordem = ordem)  
 
-    def as_query_slop(self, criterios, criterios_nao, campos_texto, campos_texto_raw, distancia, ordem):
-        _campo = Operadores.campo_texto_grupo(criterios, campo_texto=campos_texto, campo_texto_raw=campos_texto_raw, unico=True)
-        _campo_nao = Operadores.campo_texto_grupo(criterios_nao, campo_texto=campos_texto, campo_texto_raw=campos_texto_raw, unico=True)
+    def as_query_slop(self, criterios, criterios_nao, campos_texto, sufixo_campo_raw, distancia, ordem):
+        _campo = Operadores.campo_texto_grupo(criterios, campo_texto=campos_texto, sufixo_campo_raw=sufixo_campo_raw, unico=True)
+        _campo_nao = Operadores.campo_texto_grupo(criterios_nao, campo_texto=campos_texto, sufixo_campo_raw=sufixo_campo_raw, unico=True)
         span_near = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo) for _ in criterios]
         span_near_nao = [self.as_query_operador(_, Operadores.OPERADOR_ADJ1 , _campo_nao) for _ in criterios_nao]
         qspan_near = {'clauses' : span_near, 'slop' : max(0, distancia), 'in_order' : ordem}
@@ -902,6 +961,281 @@ class PesquisaElasticFacil():
                   "must": [{"span_near" :qspan_near } ] ,
                   "must_not" : [{"span_near" :qspan_near_nao }]} }
                   }
+
+class GruposPesquisaElasticFacil():
+
+    def __init__(self, criterios_agrupados = '', campo_texto_padrao='texto', sufixo_campo_raw='.raw', campos_disponiveis = {}) -> None:
+        if PRINT_DEBUG: print(f'GruposPesquisaElasticFacil: iniciado campo:"{campo_texto_padrao}"', 'critérios:', len(criterios_agrupados)>0)
+        self.__must__ = []
+        self.__must_not__ = []
+        self.__should__ = []
+        self.__as_string__ = ''
+        self.campo_texto_padrao = campo_texto_padrao
+        self.sufixo_campo_raw = sufixo_campo_raw
+        self.avisos = [] # registra sugestões de avisos para o usuário
+        # configura os campos disponíveis para critérios em grupo
+        # bem como o sufixo raw de cada um se existir
+        # por padrão o sufixo raw é vazio se não for configurado
+        # exemplo: {'texto':'.raw', 'titulo':'', 'nome':''}
+        # se campos_disponiveis estiver vazio, permite incluir qualquer campo
+        self.campos_disponiveis = campos_disponiveis if type(campos_disponiveis) is dict else dict(campos_disponiveis)
+        if criterios_agrupados:
+            self.add_criterios_agrupados(criterios_agrupados)
+
+    def __valida_parenteses__(self,criterios):
+        a = [1 for _ in criterios if _=='(']
+        f = [1 for _ in criterios if _==')']
+        if a>f:
+            raise ValueError(ERRO_PARENTESES_FALTA_FECHAR)
+        elif f>a:
+            raise ValueError(ERRO_PARENTESES_FECHOU_MAIS)
+
+
+    # um campo é válido se for igual ao padrão 
+    # ou se está na lista de disponíveis ou se não há lista de disponíveis
+    def __valida_campo_grupo__(self, campo):
+        # print('VALIDANDO CAMPO ', campo, 'CAMPOS', list(self.campos_disponiveis.keys()))
+        res =  campo==self.campo_texto_padrao or \
+               campo in self.campos_disponiveis.keys() or \
+               not any(self.campos_disponiveis.keys()) 
+        if res:
+            return True 
+        msg = f'campos_pesquisa: o campo {campo} não está disponível para pesquisa, corrija a lista de campos disponíveis ou corrija o nome do campo.'
+        raise KeyError(msg)
+
+    # retorna o sufixo do campo informado ou ''
+    def __retorna_sufixo_campo_raw__(self, campo):
+        self.__valida_campo_grupo__(campo)
+        # se for o campo padrão e o sufixo for vazio, 
+        # verifica se o sufixo está na lista para esse campo
+        if campo == self.campo_texto_padrao and self.sufixo_campo_raw:
+           return self.sufixo_campo_raw
+        # busca o sufixo do campo ou vazio
+        sufixo = self.campos_disponiveis.get(campo,'')
+        return str(sufixo)
+
+    # retorna o campo informado com sufixo raw ou só o campo
+    def __retorna_campo_raw__(self, campo):
+        return f'{campo}{self.__retorna_sufixo_campo_raw__(campo)}'
+
+    # busca o próximo fechamento levando em consideração que pode abrir algum parênteses no meio
+    def __get_proximo_fechamento__(self, texto):
+        q_abre, pos = 0,-1
+        for c in texto:
+            pos +=1
+            if c == ')' and q_abre ==0:
+                #acabou pois achou o fechamento sem abertura pendente
+                return pos
+            elif c == ')' and q_abre >0:
+                q_abre += -1 
+            elif c == '(':
+                q_abre += 1
+        # não conseguiu achar o fechamento
+        return -1
+
+    # varre os grupos entre parênteses que contenham indicador de campo 
+    # Exemplo: .campo_texto.(critérios)  .campo_nome.(criterios)
+    # adiciona os critérios no objeto
+    def add_criterios_agrupados(self, criterios):
+        _criterios = str(criterios)
+        self.__valida_parenteses__(_criterios)
+        ini = 0
+        lista_grupos = [] # (operador, campo, critérios de grupo)
+        for grupo in Operadores.RE_OPERADOR_CAMPOS_GRUPOS.finditer(criterios):
+            # até o operador de campo
+            criterio_raiz = _criterios[ini:grupo.start()].strip()
+            _criterio_raiz_split = criterio_raiz.split(' ')
+            # abertura de parênteses seguido de campo de pesquisa
+            if any(_criterio_raiz_split) and _criterio_raiz_split[-1][-1]=='(':
+                raise ValueError(ERRO_OPERADOR_CAMPO_PARENTESES)
+            # operador ou iniciando o critério raiz
+            if any(_criterio_raiz_split) and Operadores.e_operador_ou(_criterio_raiz_split[0]):
+                raise ValueError(ERRO_OPERADOR_OU_CAMPO_RAIZ)
+            # operador antes de campo de pesquisa, identifica o operador e separa os critérios anteriores
+            # para adicionar ao conjunto de pesquisa
+            operador = ''
+            if any(_criterio_raiz_split) and Operadores.e_operador(_criterio_raiz_split[-1]):
+                operador = _criterio_raiz_split[-1].upper()
+                criterio_raiz = ' '.join(_criterio_raiz_split[:-1])
+            # critério de pesquisa por campo
+            campo = _criterios[grupo.start():grupo.end()]
+            # prepara o campo para ver se tem operador junto
+            campo = campo.replace('.(',' ').replace('.',' ').replace('  ',' ').strip()
+            ini = grupo.end()
+            pos_fim = self.__get_proximo_fechamento__(_criterios[ini:])
+            pos_fim = ini if pos_fim<0 else ini+pos_fim+1
+            criterios_campo = _criterios[ini:pos_fim-1]
+            ini = pos_fim
+            # adiciona o critério raiz anterior à pesquisa por campo
+            if criterio_raiz:
+                lista_grupos.append(('','', criterio_raiz))
+            if criterios_campo:
+                lista_grupos.append((operador,campo, criterios_campo))
+        # adiciona o critério raiz após a última pesquisa por campo
+        criterio_raiz = _criterios[ini:len(_criterios)]
+        lista_grupos.append(('','', criterio_raiz))
+
+        for inclusao in lista_grupos:
+            operador, campo, criterios_campo = inclusao
+            if criterios_campo.strip():
+                if PRINT_DEBUG: print(f'INCLUINDO GRUPO {operador}:', 'campo: ', campo, 'critérios: ', criterios_campo)
+                if campo and Operadores.RE_OPERADOR_RANGE.search(criterios_campo):
+                    # quebra os operadores e valores esperando valor operador valor operador
+                    _valores = Operadores.RE_OPERADOR_RANGE.split(criterios_campo)
+                    _operadores = Operadores.RE_OPERADOR_RANGE.findall(criterios_campo)
+                    op1 = _operadores[0] if any(_operadores) else ''
+                    op2 = _operadores[1] if len(_operadores)>1 else ''
+                    vl1 = _valores[1] if len(_valores)>1 else ''
+                    vl2 = _valores[2] if len(_valores)>2 and op2 else ''
+                    # ajuste para datas
+                    vl1 = vl1.replace('/','-').replace('"','').replace("'",'').strip()
+                    vl2 = vl2.replace('/','-').replace('"','').replace("'",'').strip()
+                    # inclui os critérios
+                    if PRINT_DEBUG: print('  -- range : ', f'.{campo}.({op1}{vl1}{op2}{vl2})')
+                    if op1 and vl1:
+                        self.__add_valor__(campo,op1,vl1,op2,vl2,tipo=operador)
+                else:
+                    campo = self.campo_texto_padrao if not campo else campo
+                    _sufixo_campo_raw = self.__retorna_sufixo_campo_raw__(campo)
+                    pe = PesquisaElasticFacil(criterios_originais=criterios_campo, campo_texto=campo, 
+                                              sufixo_campo_raw=_sufixo_campo_raw, e_subgrupo_pesquisa=True)
+                    self.__add_Pesquisa__(pe, tipo=operador)
+
+    def __add_Pesquisa__(self, pesquisa: PesquisaElasticFacil, tipo = 'E'):
+        if type(pesquisa) is not PesquisaElasticFacil:
+            msg = f'add_{tipo}_Pesquisa: precisa receber um objeto PesquisaElasticFacil'
+            raise Exception(msg)
+        query = pesquisa.criterios_elastic.get('query',{})
+        self.avisos.extend(pesquisa.avisos)
+        if tipo == 'OU':
+            self.__should__.append(query)
+            self.__as_string__ += f' OU .{pesquisa.campo_texto}.({pesquisa.as_string()})'
+        elif tipo == 'NAO':
+            self.__must_not__.append(query)
+            self.__as_string__ += f' NAO .{pesquisa.campo_texto}.({pesquisa.as_string()})'
+        else:
+            self.__must__.append(query)
+            if self.__as_string__: 
+                self.__as_string__ += ' E'
+            self.__as_string__ += f' .{pesquisa.campo_texto}.({pesquisa.as_string()})'
+
+    def add_E_Pesquisa(self, pesquisa: PesquisaElasticFacil):
+        self.__add_Pesquisa__(pesquisa,'E')
+
+    def add_NAO_Pesquisa(self, pesquisa: PesquisaElasticFacil):
+        self.__add_Pesquisa__(pesquisa,'NAO')
+
+    def add_OU_Pesquisa(self, pesquisa: PesquisaElasticFacil):
+        self.__add_Pesquisa__(pesquisa,'OU')
+
+    def __add_termo__(self, campo_texto, valor, tipo='E'):
+        if ( not str(campo_texto) ) or ( not str(valor) ):
+            msg = f'add_{tipo}_termo: precisa receber um campo e um valor'
+            raise Exception(msg)
+        termo = Operadores.formatar_termo(valor)
+        # verifica aspas e a existência de campo raw para aspas
+        _sufixo_campo_raw = self.__retorna_sufixo_campo_raw__(campo_texto)
+        _campo = Operadores.campo_texto_termo(termo = termo, campo_texto=campo_texto, sufixo_campo_raw=_sufixo_campo_raw, unico=True)
+        criterio = PesquisaElasticFacil.as_query_operador(termo,'E', _campo)
+        if tipo == 'OU':
+            self.__should__.append(criterio)
+            self.__as_string__ += f' OU .{_campo}.({termo})'
+        elif tipo == 'NAO':
+            self.__must_not__.append(criterio)
+            self.__as_string__ += f' NAO .{_campo}.({termo})'
+        else:
+            self.__must__.append(criterio)
+            if self.__as_string__: 
+                self.__as_string__ += ' E'
+            self.__as_string__ += f' .{_campo}.({termo})'
+
+    def add_E_termo(self, campo, valor):
+        self.__add_termo__(campo, valor, 'E')
+
+    def add_OU_termo(self, campo, valor):
+        self.__add_termo__(campo, valor, 'OU')
+
+    def add_NAO_termo(self, campo, valor):
+        self.__add_termo__(campo, valor, 'NAO')
+
+    # aceita um ou dois operadores - dois para o caso de intervalos
+    # {"range": {"idade": {"gte": 10, "lte": 20 }}}
+    def __add_valor__(self, campo_valor, operador, valor, operador2='', valor2='', tipo='E'):
+        if ( not str(campo_valor) ) or ( not str(valor) ) or ( not str(operador) ):
+            msg = f'add_{tipo}_valor: precisa receber um campo, um operador e um valor (Ex. "idade", ">=","10")'
+            raise Exception(msg)
+        if Operadores.RE_TERMO_COM_CURINGA.match(str(valor)) or \
+           Operadores.RE_TERMO_COM_CURINGA.match(str(valor2)) :
+            msg = f'add_{tipo}_valor: não aceita curingas nos valores informados - valor : "{valor}" valor2 : "{valor2}"'
+            raise Exception(msg)
+        def _operador(_op):
+            _op = str(_op).lower()
+            if _op in ('>','gt'): return 'gt'
+            if _op in ('>=','gte'): return 'gte'
+            if _op in ('<','lt'): return 'lt'
+            if _op in ('<=','lte'): return 'lte'
+            return '='
+        _operador1 = _operador(operador)
+        _valor1 = Operadores.formatar_termo(valor) if type(valor) is str else valor
+        # operador =, retorna o critério mais simples
+        if _operador1=='=':
+            criterio = { "term": { f"{campo_valor}": valor } }
+            _str = f' = {valor}'
+        else:
+            # operadores >, <, >= ou <=
+            _str = f'{operador} {valor}'
+            _range = {f"{_operador1}": _valor1}
+            if operador2 :
+                _operador2 = _operador(operador2)
+                _valor2 = Operadores.formatar_termo(valor2) if type(valor2) is str else valor2
+                _range[f"{_operador2}"] = _valor2
+                _str = f'{_str} {operador2} {valor2}'
+            criterio = {"range": {f"{campo_valor}": _range}}
+        if tipo == 'OU':
+            self.__should__.append(criterio)
+            self.__as_string__ += f' OU .{campo_valor}.({_str})'
+        elif tipo == 'NAO':
+            self.__must_not__.append(criterio)
+            self.__as_string__ += f' NAO .{campo_valor}.({_str})'
+        else:
+            self.__must__.append(criterio)
+            if self.__as_string__: 
+                self.__as_string__ += ' E'
+            self.__as_string__ += f' .{campo_valor}.({_str})'
+
+    def add_E_valor(self, campo, operador, valor, operador2 = None, valor2 = None):
+        self.__add_valor__(campo, operador, valor, operador2, valor2, 'E')
+
+    def add_OU_valor(self, campo, operador, valor, operador2 = None, valor2 = None):
+        self.__add_valor__(campo, operador, valor, operador2, valor2, 'OU')
+
+    def add_NAO_valor(self, campo, operador, valor, operador2 = None, valor2 = None):
+        self.__add_valor__(campo, operador, valor, operador2, valor2, 'NAO')
+
+    def as_query(self, campo_highlight = ''):
+        # nenhum resultado
+        if not (any(self.__must__) or any(self.__must_not__) or any(self.__should__)):
+            return None
+        _must = self.__must__
+        if any(self.__should__):
+            _must.append({"bool": {"should" : self.__should__}})
+        _bool = {}
+        if any(_must):
+            _bool['must'] = _must
+        if any(self.__must_not__):
+            _bool['must_not'] = self.__must_not__
+        # retorna a query bool ou a query none se não tiver critérios
+        if any(_bool):
+            query = { "query": {"bool": _bool } }
+        else:
+            query = { "query": {"match_none": {} } }
+        if campo_highlight:
+            query['_source'] = [""]
+            query['highlight'] = {"type" : "plain", "fields": {   f"{campo_highlight}": CRITERIO_CAMPO_HIGHLIGHT   }}
+        return query
+
+    def as_string(self):
+        return self.__as_string__.strip()
 
 class PesquisaElasticFacilTeste():
     def __init__(self):
@@ -953,9 +1287,10 @@ class PesquisaElasticFacilTeste():
 
 
 if __name__ == "__main__":
-    TESTE_DEBUG = True
+    PRINT_DEBUG = True
 
     def teste_criterios():
+        print('-- CRITÉRIOS ------------------------------------')
         teste = 'teste1 adj3 teste2 prox5 teste3 ou teste4 ou teste5'
         teste = '(dano adj2 mora* dano prox10 moral prox5 material que?ra) e "sem quebra"'
         teste = 'dano adj2 "moral" "dano" prox10 "moral" prox5 material mora*'
@@ -967,6 +1302,7 @@ if __name__ == "__main__":
         teste = '25/06/1976 (123,456.789-00 e 25:06:1976)'
         teste = 'inss aposentadoria NÃO (administrativamente ou administrativa)'
         teste = '(dano ADJ1 moral)'
+        teste = "'Dano moral' estetico prox10 material ou 'dano material' "
         pbe = PesquisaElasticFacil(teste)
         print('Original : ', teste.strip())
         print('Critérios: ', pbe.criterios_reformatado)
@@ -975,7 +1311,7 @@ if __name__ == "__main__":
         print('AsQuery: ', json.dumps(pbe.criterios_elastic_highlight) )
 
     def teste_mlt():
-        print('--------------------------------------')
+        print('-- MORE LIKE THIS ------------------------------------')
         teste = 'adj10: dano  "moral" "dano"  "moral" material mora* nao (presumido estético)'
         pbe = PesquisaElasticFacil(teste)
         print('Original : ', teste.strip())
@@ -984,11 +1320,41 @@ if __name__ == "__main__":
         print('AsString: ', pbe.as_string())
         print('AsQuery: ', json.dumps(pbe.criterios_elastic_highlight) )
 
-    #teste_mlt()
-    teste_criterios()
+    def teste_grupos():
+        print('-- GRUPOS ------------------------------------')
+        '''
+        grupo = GruposPesquisaElasticFacil('dano moral .titulo.(titulo adj2 1) (material norma) nao .tiulo.(6)')
+        teste = 'adj10: dano moral material'
+        grupo.add_E_Pesquisa( PesquisaElasticFacil(teste) )
+        grupo.add_NAO_Pesquisa( PesquisaElasticFacil('"cada"') )
+        #grupo.add_OU_termo('titulo','1')
+        #grupo.add_OU_termo('titulo','2')
+        grupo.add_E_valor('numero','>',2,'<=',50)
+        '''
 
-    print('--------------------------------------')
-    TESTE_DEBUG = False
-    PesquisaElasticFacilTeste()
-    print('Teste OK')
+        teste = 'adj2: dano moral .dthr_vetor.(>2021-01-01<=2022-01-01)'
+        teste = 'material .sg_classe.(resp OU aresp) E .dt_rg_protocolo.(>= 2020-08-01 E < 2022-01-01) E .texto.(("Dano" ADJ1 "moral") E (estetico PROX10 material)) '
+        teste = '.sg_classe.(resp OU aresp) OU .dt_rg_protocolo.(>= 2020-08-01 < 2022-01-01) E .texto.(("Dano" ADJ1 "moral") E (estetico PROX10 material)) E .texto.(material)'
+        teste = '.sg_classe.(resp OU aresp) ou .dt_rg_protocolo.(>= 2020-08-01 < 2022-01-01) E .texto.(("Dano" ADJ1 "moral") E (estetico PROX10 material)) ou .texto.(material)'
+        teste = "'Dano moral' estetico prox10 material .sg_classe.(resp ou aresp) .dt_rg_protocolo.(>=2020-08-01 <='2022-01-01')"
+        teste = "'Dano moral' estetico prox10 material ou 'dano material' "
+        grupo = GruposPesquisaElasticFacil(teste)
+        #grupo.add_E_valor('dthr_vetor','>','2021-01-01','<=','2021-01-30')
+        #grupo.add_E_Pesquisa( PesquisaElasticFacil(teste) )
+        query = grupo.as_query('texto')
+        #print('AsString: ', pbe.as_string())
+        print('AsString: ', grupo.as_string())
+        print('AsQuery: ', json.dumps(query) )
+
+    def autoteste():
+        print('--------------------------------------')
+        PRINT_DEBUG = False
+        PesquisaElasticFacilTeste()
+        print('Teste OK')
+
+    #teste_mlt()
+    #teste_criterios()
+    teste_grupos()
+    #autoteste()
+
     
