@@ -1,8 +1,8 @@
 # PesquisaElasticFacil 
 Componente python que simplifica a construção de queries no ElasticSearch e permite o uso dos operadores de proximidade de termos, comuns no BRS, em queries internas do ElasticSearch. Não há intenção de competir com a ferramenta BRS, apenas aproveitar o conhecimento do usuário ao receber critérios de proximidade usados no BRS (`PROX`, `ADJ`, `COM`) e convertê-los para os critérios próximos no elastic, bem como simplificar a forma de escrita dos critérios de pesquisa e traduzi-los para conjuntos mais robustos de pesquisa no ElasticSearch.
 
-- Código do componente python: [`PesquisaElasticFacil`](src/util_pesquisaelastic_facil.py) `atualizado: 06/10/2021`
-- Uso do componente: 
+- Código do componente python:  `atualizado: 14/10/2021`
+- Uso do componente: [`PesquisaElasticFacil`](src/util_pesquisaelastic_facil.py)
 ```python
 from util_pesquisaelastic_facil.py import PesquisaElasticFacil
 teste = 'dano adj2 "moral" "dano" prox10 "moral" prox5 material mora*'
@@ -10,6 +10,14 @@ pbe = PesquisaElasticFacil(teste)
 # pbe.criterios_elastic_highlight  contém a query elastic com a chave highlight para trazer trechos grifados 
 # pbe.criterios_elastic contém a query elastic pura
 queryelastic = pbe.criterios_elastic_highlight 
+```
+- Uso do componente [`GruposPesquisaElasticFacil`](src/util_pesquisaelastic_facil.py): permite agrupar pesquisas por campo do elastic e inserir critérios extras
+```python
+from util_pesquisaelastic_facil.py import PesquisaElasticFacil
+teste = "'psicologia clínica' .tipo_doc.(artigo ou revista) .data.(>=2020-08-01 <='2022-01-01')"
+pbe = GruposPesquisaElasticFacil(teste)
+pbe.add_E_valor('ano','>',2000,'<=',2020)
+queryelastic = grupo.as_query(campo_highlight='texto')
 ```
 - Depois é só rodar a query no ElasticSearch
 
@@ -39,7 +47,16 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
  - o `NÃO` antes de um grupo afeta todo o grupo: `"dano moral" não (material e prejuízo)`
  - se nos critérios tiver `ADJ` e depois `PROX` ou vice-versa, os termos entre eles serão duplicados para cada grupo ex.: `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 prox10 termo2) E (termo2 ADJ3 termo3)`
  - o elastic trabalha com proximidade (SLOP) sequencial (como o `ADJ`) ou não sequencial (como o `PROX`) mas não permite juntar esses operadores nem ter uma distância para cada termo, então será usada a maior distância por grupo criado.
- 
+
+## Regras em grupos por campo:
+ - O componente `GruposPesquisaElasticFacil` permite que o usuário escreva alguns critérios simples dentro do campo de pesquisa, como filtros por campos liberados.
+ - Os filtros podem ser do tipo range de data, valores numéricos ou string. Podem ser adicionados filtros extras por linhas de código também.
+ - Vou incluir uma página com exemplos de uso desses critérios.
+ - Pesquisas de campo não podem ser comparadas com pesquisas simples. O uso de `NÃO` é liberado, mas o uso do `OU` tem algumas ressalvas.
+   - `NÃO` antes do grupo, ex. `NAO .idade.(>15) NAO .tipo.(comentario)` cria as condições negativas para `idade>15` e para `tipo=comentario`
+   - `OU` antes do grupo: `(artigo científico) OU .tipo.(artigo ou revista) .data.(> 2021-01-01) OU .autor.(skinner)`
+     - Esse exemplo pesquisa os documento do tipo artigo ou revista ou do autor Skinner, com data maior que "2021-01-01" e que contenham os termos "artigo" e "científico". Mesmo os grupos com `OU` estando separados, eles são analisados em conjunto, precisando que pelo menos um dos critérios `OU` seja atendido.
+
 ### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
  - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)` ==> dois grupos foram criados
  - `termo1 prox5 termo2 prox10 termo3` ==> `(termo1 PROX10 termo2 PROX10 termo3)` ==> fica valendo o maior PROX
