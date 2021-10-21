@@ -71,6 +71,7 @@ GET /explorasim/_search
 - Pode-se misturar regex, wildcards e termos completos, mas a proximidade deles é fixa para o grupo, diferente do BRS que permitia definir a proximidade a cada termo.
 - Mais informações: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-span-near-query.html
 ```json
+GET /explorasim/_search
 {
   "query": {
     "span_near": {
@@ -96,6 +97,7 @@ GET /explorasim/_search
 - A pesquisa pode ser combinada com `More like this`, `span_near` e qualquer outra formação de query do elastic, permitindo pesquisas robusas, mas cada vez mais complexas para um usuário comum construir.
 - Essa foi a motivação de um componente que permitisse transformar operadores simples de usar em pesquisas mais robustas e precisas que o ElasticSearch permite construir: [`PesquisaElasticFacil`](../README.md) 
 ```json
+GET /explorasim/_search
 { "_source": ["titulo"],
   "query": {
       "script_score": {
