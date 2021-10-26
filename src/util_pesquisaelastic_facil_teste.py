@@ -10,7 +10,6 @@
 #   -> https://github.com/luizanisio/PesquisaElasticFacil/
 # Luiz Anísio 
 
-from re import T
 import unittest
 import sys
 from util_pesquisaelastic_facil import PesquisaElasticFacil, GruposPesquisaElasticFacil, Operadores
