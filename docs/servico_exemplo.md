@@ -25,7 +25,7 @@
 ![Painel com resultados](img001_tela_criterios_resultados.png?raw=true "Title")
 
 #### Painel para envio de arquivos para processamento
-<i> > `em construção` - permitirá que seja enviado um arquivo para ser indexado na base, vetorizado pelo modelo Doc2VecFacil para agrupamento e pesquisa vetorial.</i>
+<i> > `em construção` - permitirá que seja enviado um arquivo para ser indexado na base, vetorizado pelo modelo [`Doc2VecFacil`](https://github.com/luizanisio/Doc2VecFacil) para agrupamento e pesquisa vetorial.</i>
 
 ### Alguns códigos do serviço:
 - chamada para retornar os documentos que serão apresentados:
