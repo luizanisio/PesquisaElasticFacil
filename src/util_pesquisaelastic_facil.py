@@ -31,9 +31,11 @@
 # Ver 0.2.0 - 14/10/2021 - Grupos de pesquisas e campos disponíveis GruposPesquisaElasticFacil
 #                        - Otimizações e correções
 #                        - mensagens e alertas para apresentação ao usuário
+# Ver 0.2.1 - 25/10/2021 - .raw ou raw nos sufixos
+# Ver 0.3.0 - 26/10/2021 - testes unitários e pequenas correções na tokenização
 #
 # TODO: 
-# - criar testes para queries do Elastic transformadas
+# - ampliar casos de teste
  
 import re
 from unicodedata import normalize
@@ -48,86 +50,6 @@ ERRO_OPERADOR_CAMPO_PARENTESES = 'campos_pesquisa: Não são aceitos operadores 
 ERRO_PARENTESES_CAMPO = 'Não são aceitos operadores de campo dentro de parênteses.'
 ERRO_OPERADOR_OU_CAMPO_RAIZ = 'Não são aceitos operadores OU entre critérios de grupo e critérios simples'
 
-TESTES = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
-           ('"dano moral','"dano" ADJ1 "moral"'),
-           ('dano com moral','dano PROX30 moral'),
-           ('nao "dano moral" dano prox5 material','NAO ("dano" ADJ1 "moral") E (dano PROX5 material)'),
-           ('"dano" prox10 "moral"', '"dano" PROX10 "moral"'),
-           ('termo1 E termo2 termo3 OU termo4' , 'termo1 E termo2 E (termo3 OU termo4)'),
-           ('termo1 E termo2 termo3 NÃO termo4' , 'termo1 E termo2 E termo3 NAO termo4'),
-           ('termo1 E termo2 termo3 NÃO termo4 ou termo5' , 'termo1 E termo2 E termo3 NAO (termo4 OU termo5)'),
-           ('dano moral e material','dano E moral E material'),
-           ('dano prox5 material e estético', '(dano PROX5 material) E estetico'),
-           ('dano prox5 material estético', '(dano PROX5 material) E estetico'),
-           ('estético dano prox5 material', 'estetico E (dano PROX5 material)'),
-           ('estético e dano prox5 material', 'estetico E (dano PROX5 material)'),
-           ('dano moral (dano prox5 "material e estético)','dano E moral E (dano E ("material" ADJ1 "e" ADJ1 "estetico"))'),
-           ('(dano moral) prova (agravo (dano prox5 "material e estético))','(dano E moral) E prova E (agravo E (dano E ("material" ADJ1 "e" ADJ1 "estetico")))'),
-           ('teste1 adj2 teste2 prox3 teste3 teste4', '(teste1 ADJ2 teste2) E (teste2 PROX3 teste3) E teste4'),
-           ('termo1 E termo2 OU termo3 OU termo4' , 'termo1 E (termo2 OU termo3 OU termo4)'),
-           ('termo1 E termo2 OU (termo3 adj2 termo4)' , 'termo1 E (termo2 OU (termo3 ADJ2 termo4))'),
-           ('termo1 OU termo2 termo3' , '(termo1 OU termo2) E termo3'),
-           ('termo1 OU termo2 (termo3 termo4)' , '(termo1 OU termo2) E (termo3 E termo4)'),
-           ('termo1 OU termo2 termo3 OU termo4' , '(termo1 OU termo2) E (termo3 OU termo4)'),
-           ('termo1 OU termo2 (termo3 OU termo4 termo5)' , '(termo1 OU termo2) E ((termo3 OU termo4) E termo5)'),
-           ('termo1 OU termo2 OU (termo3 OU termo4 termo5)' , 'termo1 OU termo2 OU ((termo3 OU termo4) E termo5)'),
-           ('dano adj2 mora* dano prox10 moral prox5 material que?ra', '(dano ADJ2 mora*) E (dano PROX10 moral PROX5 material) E que?ra'),
-           ('termo1 OU termo2 nao termo3' , '(termo1 OU termo2) NAO termo3'),
-           ('termo1 OU termo2 nao (termo3 Ou termo4)' , '(termo1 OU termo2) NAO (termo3 OU termo4)'),
-           ('((termo1 OU termo2) nao (termo3 Ou termo4)) termo5 prox10 termo6' , '((termo1 OU termo2) NAO (termo3 OU termo4)) E (termo5 PROX10 termo6)'),
-           ('termo1, termo2:texto3 nao [termo4]' , 'termo1 E termo2 E texto3 NAO termo4'),
-           ('123.456.789,123 25/06/1976 25_06_1976 a.b a-b a,b','123.456.789,123 E 25/06/1976 E 25_06_1976 E a E b E a E b E a E b'),
-           ('123:456.789,123 25_06_1976 a|b:c:: a1|2b:c3::','123:456.789,123 E 25_06_1976 E a E b E c E a1 E 2b E c3'),
-           ('(123:456.789,123 (25_06_1976 a|b:c::)) a1|2b:c3::','(123:456.789,123 E (25_06_1976 E a E b E c)) E a1 E 2b E c3'),
-        )
-
-TESTES_ENTRADA_FALHA = ( 
-           ('dano Adj e moRal','dano E moRal'),
-           ('dano (moRal)','dano E moRal'),
-           ('dano e (moRal)','dano E moRal'),
-           ('dano Adj (moRal)','dano ADJ1 moRal'),
-           ('dano Adj (moRal material)','dano E (moRal E material)'),
-           ('dano (ADJ moRal)','dano E moRal'),
-           ('adj dano prox1(ADJ moRal not)','dano E moRal'),
-           ('dano e ou adj5 prox5 moRal','dano PROX5 moRal'),
-           ('dano e ou adj5 prox5 e moRal','dano E moRal'),
-           ('dano e ou adj5 (adj5) prox5 e moRal','dano E moRal'),
-           ('(termo1) ADJ1 (termo2)','termo1 ADJ1 termo2'),
-           ('nao (termo1) nao ADJ1 (termo2)','NAO (termo1 ADJ1 termo2)'),
-           ('a123456,??  dano? prox5 mora? dano adj20 material estetic??','a123456 E (dano? PROX5 mora?) E (dano ADJ20 material) E estetic??'),
-           ('2020','2020'),('(2020)','2020'),("'2020'",'"2020"'),
-           ('"dano - moral"','"dano" ADJ1 "moral"'),
-        )
-
-TESTES_CURINGAS = (
-    ('casa*',  'casa.*'), ('casa','casa'), ('ca$sa','ca.*sa'), 
-    ('?ca$sa','.{0,1}ca.*sa'), ('?ca$s*a','.{0,1}ca.*s.*a'), 
-    ('*$ca???sa??','.*ca.{0,3}sa.{0,2}'), 
-    ('casa?', 'casa.{0,1}'), 
-    ('ca??sa?', 'ca.{0,2}sa.{0,1}'),
-    ('?ca??sa?', '.{0,1}ca.{0,2}sa.{0,1}'),
-    ('123.456,??', '123_?456_?.{0,2}'),
-    ('123.456', '123_?456'), ('123456', '123_?456'),
-    ('1234567', '1_?234_?567'),
-    ('123456,??', '123_?456_?.{0,2}'),
-    ('a123456,??', 'a123456 .{0,2}'), ('123:456.789,123','123_?456_?789_?123'),
-    ('25/06/1976','25_?06_?1976'), ('25:06:1976','25_?06_?1976'), 
-    ('123,456.789-00','123_?456_?789_?00'), ('123-456-789-00','123_?456_?789_?00'),
-    ('123::456.789-00','123_?456_?789_?00')
-)
-
-TESTES_OPERADORES = (
-    ('casa*', 'ADJ1', 'span_multi', "('case_insensitive', true),('value', 'casa*')"),
-    ('ca??', 'ADJ2', 'span_multi', "('case_insensitive', true),('value', 'ca.{0,2}')"),
-    ('ca?a*', 'E', 'regexp', "('case_insensitive', true),('value', 'ca.{0,1}a.*')"),
-    ('?ca?a*', 'PROX10', 'span_multi', "('case_insensitive', true),('value', '.{0,1}ca.{0,1}a.*')"),
-    ('2020', 'E', 'regexp', "('case_insensitive', true),('value', '2_?020')"),
-    ('"/ano/"','E','term',"ano"),
-    ("'/plano/'",'E','term',"plano"),
-    ("/plana,",'E','term',"plana"),
-)
-
-
 PRINT_DEBUG = False
 PRINT_WARNING = True
 
@@ -136,6 +58,7 @@ PRINT_WARNING = True
 # diferenciando os operadores dos termos de pesquisa 
 #----------------------------------------------------------
 class Operadores():
+    RE_LIMPAR_CRITERIOS_INICIAIS = re.compile(r'(?<=\D)[,\.\/](?=\D)|(?<=\d)[,\.\/](?=\D)|(?<=\D)[,\.\/](?=\d)|[+\-:\[\]\{\}`´@!#%¨&=]',re.IGNORECASE)
     RE_TOKEN_CRITERIOS = re.compile(r'(adjc?\d*|proxc?\d*|com)$',re.IGNORECASE)
     RE_TOKEN_CRITERIOS_AGRUPAMENTO = re.compile(r'(adjc?\d*|proxc?\d*|ou)$',re.IGNORECASE)
     RE_TOKEN_ADJ = re.compile(r'adjc?\d*$',re.IGNORECASE)
@@ -152,7 +75,7 @@ class Operadores():
     RE_TOKEN_E = re.compile(r'e$',re.IGNORECASE)
     RE_TOKEN_INTERROGA = re.compile(r'([\?]+)')
     RE_TOKEN_ASTERISCO = re.compile(r'([\*\$]+)')
-    RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"]') # o token já estará sem acentos
+    RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"_]') # o token já estará sem acentos
     RE_LIMPAR_TERMO_ASPAS = re.compile(f'( \")|(\" )') # o token já estará sem acentos
     RE_LIMPAR_TERMO_MLT = re.compile(f'[^A-Za-z\d]') # tokens limpos de pesquisa
     #RE_OPERADOR_CAMPOS_GRUPOS = re.compile(r'(\.\w+\.\()|(\s+n[ãa]o\s*\.\w+\.\()|(\s+e\s*\.\w+\.\()|(\s+ou\s*\.\w+\.\()', re.IGNORECASE)
@@ -426,8 +349,9 @@ class PesquisaElasticFacil():
     # e_subgrupo_pesquisa apenas identifica que está rodando a pesquisa de dentro de um grupo de campo para melhorar as mensagens de erro
     RE_CONTEM = re.compile('^cont[eé]m:', re.IGNORECASE)
     RE_INTELIGENTE = re.compile('^(adj\d*|prox\d*|cont[ée]m):', re.IGNORECASE)
-    RE_CONTEM_INTELIGENTE = re.compile(r'd?[aiou] |de|[ a-z],|[{}\[\]]|[a-z]:')
-    RE_NAO_CONTEM_INTELIGENTE = re.compile(r'\W(adj\d*|prox?\d*|com)\W',re.IGNORECASE)
+    RE_CONTEM_INTELIGENTE = re.compile(r'\bd?[aiou]\b|\bde\b|\b[a-z]\b')
+    RE_CONTEM_INTELIGENTE_SIMBOLOS = re.compile(r'\D[,\/]\D|[{}\[\]:]|^[,\/]|[,\/]$')
+    RE_NAO_CONTEM_INTELIGENTE = re.compile(r'\b(adj\d*|prox?\d*|com)\b',re.IGNORECASE)
     RE_NAO = re.compile(r'\s+n[aã]o\s*\([^\)]+\)')
     RE_NAO_LIMPAR = re.compile(r'(\s+n[aã]o\s*\()|(\()|(\))')
     def __init__(self, criterios_originais,  campo_texto = 'texto', sufixo_campo_raw = None, e_subgrupo_pesquisa = False):
@@ -437,6 +361,7 @@ class PesquisaElasticFacil():
         self.contem_operadores = False
         self.campo_texto = str(campo_texto)
         self.sufixo_campo_raw = '' if not sufixo_campo_raw else str(sufixo_campo_raw)
+        self.sufixo_campo_raw = f'.{self.sufixo_campo_raw}' if self.sufixo_campo_raw and self.sufixo_campo_raw[0] !='.' else self.sufixo_campo_raw
         self.criterios_listas = []
         self.avisos = [] # registra sugestões de avisos para o usuário
         # valida se a pesquisa contém operadores de campos pois não é aceito nessa classe
@@ -447,11 +372,10 @@ class PesquisaElasticFacil():
             else:
                raise ValueError(ERRO_OPERADOR_CAMPO_PESQUISA)
 
-        # começar os critérios com : é um scape para essa análise automática
+        # começar os critérios com : é um escape para essa análise automática
         # mais de 50 de tamanho, não tem adj ou prox ou campo agrupado
-        # e com mais de um caracteres estranhos às pesquisas, considera "contém:""
-        if not self.pesquisa_inteligente and self.criterios_originais[:1] != ':' and \
-            len(self.criterios_originais) > 50:
+        # e com mais de um caracteres estranhos às pesquisas, considera "contém:"
+        if not self.pesquisa_inteligente and self.criterios_originais[:1] != ':' :
             _teste = Operadores.remover_acentos(self.criterios_originais).lower()
             if Operadores.RE_TOKEN_ADJ.search(_teste) or \
                Operadores.RE_TOKEN_PROX.search(_teste) or \
@@ -460,7 +384,8 @@ class PesquisaElasticFacil():
                 pass
             else:
                 qtd_quebrados = len(self.RE_CONTEM_INTELIGENTE.findall(_teste))
-                if (qtd_quebrados > 1):
+                simbolos = self.RE_CONTEM_INTELIGENTE_SIMBOLOS.search(_teste)
+                if simbolos or (qtd_quebrados > 1):
                     if PRINT_WARNING: print(f'Critério CONTÉM: inserido >> {len(self.criterios_originais)} caracteres e {qtd_quebrados} termos não pesquisáveis')
                     self.pesquisa_inteligente = True
                     self.criterios_originais = f'CONTÉM: {self.criterios_originais}'
@@ -472,8 +397,10 @@ class PesquisaElasticFacil():
         if self.pesquisa_inteligente:
             self.executar_pesquisa_inteligente()
         else:
+            # limpa os símbolos não tokenizáveis
+            _criterios =  Operadores.RE_LIMPAR_CRITERIOS_INICIAIS.sub(' ',self.criterios_originais)
             # transforma os critérios agrupados em lista e sublistas de critérios
-            _criterios = self.converter_parenteses_para_listas(self.criterios_originais)
+            _criterios = self.converter_parenteses_para_listas(_criterios)
             _criterios = self.corrigir_sublistas_desnecessarias(_criterios)
             # unindo os termos entre aspas agrupando entre parênteses e ADJ1
             _criterios = self.juntar_aspas(_criterios)
@@ -1016,7 +943,9 @@ class GruposPesquisaElasticFacil():
 
     # retorna o campo informado com sufixo raw ou só o campo
     def __retorna_campo_raw__(self, campo):
-        return f'{campo}{self.__retorna_sufixo_campo_raw__(campo)}'
+        sufixo = self.__retorna_sufixo_campo_raw__(campo)
+        sufixo = f'.{sufixo}' if sufixo and sufixo[0] !='.' else sufixo
+        return f'{campo}{sufixo}'
 
     # busca o próximo fechamento levando em consideração que pode abrir algum parênteses no meio
     def __get_proximo_fechamento__(self, texto):
@@ -1237,55 +1166,6 @@ class GruposPesquisaElasticFacil():
     def as_string(self):
         return self.__as_string__.strip()
 
-class PesquisaElasticFacilTeste():
-    def __init__(self):
-        # testes de curingas
-        for i, teste in enumerate(TESTES_CURINGAS):
-            token, esperado = teste
-            saida1 = Operadores.formatar_token(token)
-            saida2 = Operadores.termo_regex_interroga(saida1)
-            if esperado != saida2:
-                msg = f'TESTE PesquisaElasticFacil - TOKENS: \nCritério ({i}):\n- Entrada:  {token}\n- Saída1:   {saida1}\n- Saída2:   {saida2}\n- Esperado: {esperado}\n'
-                raise Exception(msg)
-        # testes de operadores
-        for i, teste in enumerate(TESTES_OPERADORES):
-            token, operador, chave1, esperado = teste
-            saida1 = Operadores.formatar_token(token)
-            saida2 = PesquisaElasticFacil.as_query_operador(saida1,operador.upper(),'texto')
-            _teste_json = json.dumps(saida2)
-            _teste_chave1 = chave1 in saida2.keys() # testa a primeira chave
-            _teste = saida2.get('span_multi',{}).get('match',{}).get('wildcard',{}).get('texto',{})
-            if not any(_teste): _teste = saida2.get('span_multi',{}).get('match',{}).get('regexp',{}).get('texto',{})
-            if not any(_teste): _teste = saida2.get('span_term',{}).get('texto',{})
-            if not any(_teste): _teste = saida2.get('term',{}).get('texto',{})
-            if not any(_teste): _teste = saida2.get('regexp',{}).get('texto',{})
-            if not any(_teste): _teste = saida2.get('wildcard',{}).get('texto',{})
-            if not _teste_chave1: 
-                saida2 = f'* chave {chave1} não encontrada'
-            else:
-                saida2 = ''
-                if any(_teste):
-                    if type(_teste) is str:
-                        saida2 = _teste
-                    else:
-                        saida2 = ','.join([str(_).lower() for _ in sorted(_teste.items())])
-            if esperado != saida2 or not _teste_chave1:
-                msg = f'TESTE PesquisaElasticFacil - OPERADOR: \nCritério ({i}):\n- Entrada:  {token}\n- Saída1:   {saida1}\n- Saída2:   {saida2}\n- Json:   {_teste_json}\n- Esperado: {esperado}\n'
-                raise Exception(msg)
-        # testes de tradução
-        _testes = TESTES + TESTES_ENTRADA_FALHA
-        pos_falhas = len(TESTES)                
-        for i, teste in enumerate(_testes):
-            criterio,esperado = teste 
-            pbe = PesquisaElasticFacil(criterio)
-            saida = pbe.criterios_reformatado
-            if esperado != saida:
-                _falha = ' - GRUPO DE FALHAS CORRIGIDAS' if i>=pos_falhas else ''
-                _i = i - pos_falhas if i>=pos_falhas else i
-                msg = f'TESTE PesquisaElasticFacil{_falha}: \nCritério ({_i}{_falha}):\n- Entrada:  {criterio}\n- Saída:    {saida}\n- Esperado: {esperado}\n- Lista:      {pbe.criterios_listas}\n'
-                raise Exception(msg)
-
-
 if __name__ == "__main__":
     PRINT_DEBUG = True
 
@@ -1345,12 +1225,6 @@ if __name__ == "__main__":
         #print('AsString: ', pbe.as_string())
         print('AsString: ', grupo.as_string())
         print('AsQuery: ', json.dumps(query) )
-
-    def autoteste():
-        print('--------------------------------------')
-        PRINT_DEBUG = False
-        PesquisaElasticFacilTeste()
-        print('Teste OK')
 
     #teste_mlt()
     #teste_criterios()
