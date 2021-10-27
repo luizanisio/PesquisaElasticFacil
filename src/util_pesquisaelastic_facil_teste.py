@@ -11,7 +11,6 @@
 # Luiz Anísio 
 
 import unittest
-import sys
 from util_pesquisaelastic_facil import PesquisaElasticFacil, GruposPesquisaElasticFacil, Operadores
 import json
 
@@ -51,6 +50,9 @@ TESTES_OPERADORES = (
     ('/"ano/"','E',{"term": {"texto.raw": "ano"}}), 
     ("'/plano/'",'E',{"term": {"texto.raw": "plano"}}), 
     ("/plana,",'E',{"term": {"texto": "plana"}}),
+    ("123456789",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "123_?456_?789"}}}),
+    ("1234",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "1_?234"}}}),
+    ("1234,56",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "1_?234_?56"}}}),
 )
 
 TESTES_STR = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
@@ -125,6 +127,7 @@ TESTES_QUERIES = (
          {"bool": {"must": [{"term": {"texto": "processo"}}, {"bool": {"should": [{"bool": {"must": [{"term": {"texto": "dano"}}, {"term": {"texto": "moral"}}], "must_not": [{"span_near": {"clauses": [{"span_term": {"texto": "dano"}}, {"span_term": {"texto": "material"}}], "slop": 99, "in_order": False}}]}}, {"bool": {"must": [{"term": {"texto": "dano"}}, {"term": {"texto": "material"}}], "must_not": [{"span_near": {"clauses": [{"span_term": {"texto": "dano"}}, {"span_term": {"texto": "moral"}}], "slop": 99, "in_order": False}}]}}]}}]}} ),
     ('termo1 123/termo2',{"bool": {"must": [{"term": {"texto": "termo1"}}, {"regexp": {"texto": {"case_insensitive": True, "value": "123"}}}, {"term": {"texto": "termo2"}}]}}),
     ('"termo1 123/ termo2"',{"span_near": {"clauses": [{"span_term": {"texto.raw": "termo1"}}, {"span_term": {"texto.raw": "123"}}, {"span_term": {"texto.raw": "termo2"}}], "slop": 0, "in_order": True}}),
+    ('adj10: termo1 123/termo2 termo3 nao(termo4 termo5 1243)',{"bool": {"must": [{"span_near": {"clauses": [{"span_term": {"texto": "termo1"}}, {"span_multi": {"match": {"regexp": {"texto": {"case_insensitive": True, "value": "123"}}}}}, {"span_term": {"texto": "termo2"}}, {"span_term": {"texto": "termo3"}}], "slop": 9, "in_order": True}}], "must_not": [{"span_near": {"clauses": [{"span_term": {"texto": "termo4"}}, {"span_term": {"texto": "termo5"}}, {"span_multi": {"match": {"regexp": {"texto": {"case_insensitive": True, "value": "1_?243"}}}}}], "slop": 9, "in_order": True}}]}}),
 )
 
 TESTES_GRUPOS = (
