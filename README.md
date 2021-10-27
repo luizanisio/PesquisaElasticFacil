@@ -117,8 +117,9 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
      - `(termo1) ADJ1 (termo2)` --> `termo1 ADJ1 termo2` 
  
 ## Query ElasticSearch:
- - A query será construída por grupos convertidos dos critérios `PROX` e `ADJ` para os mais próximos usando os operadores <b>MUST<b>, <b>MUT_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
+ - A query será construída por grupos convertidos dos critérios `PROX` e `ADJ` para os mais próximos usando os operadores <b>MUST<b>, <b>MUST_NOT<b>, <b>SPAN_NEAR<b> e <b>SHOULD<b>
  - no caso do uso de curingas, serão usados <b>WILDCARD<b> ou <b>REGEXP<b>
+ - no caso de termos entre aspas, se o componente tiver sido configurado com o `sufixo_campo_raw`, os termos serão pesquisados no campo raw, ou seja, no campo sem tratamento de sinônimos.
 
 ## Exemplo de queries transformadas:
  - Escrito pelo usuário: `dano prox5 moral dano adj20 material estetico`
