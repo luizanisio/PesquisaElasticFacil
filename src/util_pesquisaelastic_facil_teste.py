@@ -42,17 +42,20 @@ TESTES_CURINGAS = (
 
 TESTES_OPERADORES = (
     ('casa*', 'ADJ1', {'span_multi': {'match': {'wildcard': {'texto': {'case_insensitive': True,'value': 'casa*'}}}}}),
+    ('casa$', 'ADJ1', {'span_multi': {'match': {'wildcard': {'texto': {'case_insensitive': True,'value': 'casa*'}}}}}),
     ('ca??', 'ADJ2', {'span_multi': {'match': {'regexp': {'texto': {'case_insensitive': True,'value': 'ca.{0,2}'}}}}}),
     ('ca?a', 'E', {'regexp': {'texto': {'case_insensitive': True, 'value': 'ca.{0,1}a'}}}),
     ('?ca?a*', 'PROX10', {"span_multi": {"match": {"regexp": {"texto": {"case_insensitive": True, "value": ".{0,1}ca.{0,1}a.*"}}}}}),
     ('2020', 'E', {"regexp": {"texto": {"case_insensitive": True, "value": "2_?020"}}}),
     ('ano','E',{"term": {"texto": "ano"}}), 
+    ('$ano','E',{"wildcard": {"texto": {"case_insensitive": True, "value": "*ano"}}}), 
     ('/"ano/"','E',{"term": {"texto.raw": "ano"}}), 
     ("'/plano/'",'E',{"term": {"texto.raw": "plano"}}), 
     ("/plana,",'E',{"term": {"texto": "plana"}}),
     ("123456789",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "123_?456_?789"}}}),
     ("1234",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "1_?234"}}}),
     ("1234,56",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "1_?234_?56"}}}),
+    ("10/12/2078",'E',{"regexp": {"texto": {"case_insensitive": True, "value": "10_?12_?2078"}}}),
 )
 
 TESTES_STR = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
@@ -85,6 +88,7 @@ TESTES_STR = ( ('DANO Adj MoRal','DANO ADJ1 MoRal'),
            (':123.456.789,123 25/06/1976 25_06_1976 a.b a-b a,b','123.456.789,123 E 25/06/1976 E 25_06_1976 E a E b E a E b E a E b'),
            (':123:456.789,123 25_06_1976 a|b:c:: a1|2b:c3::','123 E 456.789,123 E 25_06_1976 E a E b E c E a1 E 2b E c3'),
            (':(123:456.789,123 (25_06_1976 a|b:c::)) a1|2b:c3::','(123 E 456.789,123 E (25_06_1976 E a E b E c)) E a1 E 2b E c3'),
+           ('termo* OU termo? nao $te?mo*' , '(termo* OU termo?) NAO *te?mo*'),
         )
 
 TESTES_STR_CORRECAO = ( 
@@ -128,6 +132,7 @@ TESTES_QUERIES = (
     ('termo1 123/termo2',{"bool": {"must": [{"term": {"texto": "termo1"}}, {"regexp": {"texto": {"case_insensitive": True, "value": "123"}}}, {"term": {"texto": "termo2"}}]}}),
     ('"termo1 123/ termo2"',{"span_near": {"clauses": [{"span_term": {"texto.raw": "termo1"}}, {"span_term": {"texto.raw": "123"}}, {"span_term": {"texto.raw": "termo2"}}], "slop": 0, "in_order": True}}),
     ('adj10: termo1 123/termo2 termo3 nao(termo4 termo5 1243)',{"bool": {"must": [{"span_near": {"clauses": [{"span_term": {"texto": "termo1"}}, {"span_multi": {"match": {"regexp": {"texto": {"case_insensitive": True, "value": "123"}}}}}, {"span_term": {"texto": "termo2"}}, {"span_term": {"texto": "termo3"}}], "slop": 9, "in_order": True}}], "must_not": [{"span_near": {"clauses": [{"span_term": {"texto": "termo4"}}, {"span_term": {"texto": "termo5"}}, {"span_multi": {"match": {"regexp": {"texto": {"case_insensitive": True, "value": "1_?243"}}}}}], "slop": 9, "in_order": True}}]}}),
+    ('10000,00 ou "dez mil reais"',{"bool": {"should": [{"regexp": {"texto": {"case_insensitive": True, "value": "10_?000_?00"}}}, {"span_near": {"clauses": [{"span_term": {"texto.raw": "dez"}}, {"span_term": {"texto.raw": "mil"}}, {"span_term": {"texto.raw": "reais"}}], "slop": 0, "in_order": True}}]}})
 )
 
 TESTES_GRUPOS = (
