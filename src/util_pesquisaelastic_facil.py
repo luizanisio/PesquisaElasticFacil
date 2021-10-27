@@ -67,15 +67,15 @@ class Operadores():
     RE_TOKEN_N = re.compile(r'\d+')
     RE_TERMO_NUMERICO = re.compile(r'[\d\?\*][\d\:\?\*\.\,\-\_\/]*[\d\?\*]$') 
     RE_TERMO_MILHAS = re.compile(r'[\d\?\*][\d\?\*\.\,]*[\d\?\*]$') 
-    RE_TERMO_SO_CURINGA = re.compile(r'[\?\*\_\$]+$') 
-    RE_TERMO_COM_CURINGA = re.compile(r'[\?\*\_\$]') 
+    RE_TERMO_SO_CURINGA = re.compile(r'[\?\*\_]+$') 
+    RE_TERMO_COM_CURINGA = re.compile(r'[\?\*\_]') 
     RE_TOKEN_QUEBRA_N = re.compile(r'[\d\.\-_\/\,\?\*\:]+$') # 123.233/2332-23,23 ou curingas - verifica se é um token numérico
     RE_TOKEN_QUEBRA_N_FORMAT = re.compile(r'[\.\-_\/\,\:]+') # 123.233/2332-23,23 ou curingas - corrige símbolos por _
     RE_TOKEN_OU = re.compile(r'ou$',re.IGNORECASE)
     RE_TOKEN_E = re.compile(r'e$',re.IGNORECASE)
     RE_TOKEN_INTERROGA = re.compile(r'([\?]+)')
-    RE_TOKEN_ASTERISCO = re.compile(r'([\*\$]+)')
-    RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\$\"_]') # o token já estará sem acentos
+    RE_TOKEN_ASTERISCO = re.compile(r'([\*]+)')
+    RE_LIMPAR_TERMO_NAO_NUMERICO = re.compile(f'[^A-Za-z\d\?\*\"_]') # o token já estará sem acentos
     RE_LIMPAR_TERMO_ASPAS = re.compile(f'( \")|(\" )') # o token já estará sem acentos
     RE_LIMPAR_TERMO_MLT = re.compile(f'[^A-Za-z\d]') # tokens limpos de pesquisa
     #RE_OPERADOR_CAMPOS_GRUPOS = re.compile(r'(\.\w+\.\()|(\s+n[ãa]o\s*\.\w+\.\()|(\s+e\s*\.\w+\.\()|(\s+ou\s*\.\w+\.\()', re.IGNORECASE)
@@ -198,7 +198,7 @@ class Operadores():
     @classmethod
     def formatar_termo(self, termo):
         # tratamento padrão
-        termo = Operadores.remover_acentos(termo).replace("'",'"')
+        termo = Operadores.remover_acentos(termo).replace("'",'"').replace('$','*')
         if not self.RE_TERMO_NUMERICO.match(termo):
             #print('Limpando termo não numérico: ', termo)
             termo = Operadores.RE_LIMPAR_TERMO_NAO_NUMERICO.sub(' ', termo).strip()
@@ -264,8 +264,8 @@ class Operadores():
     # substitui critérios de ? por .{0,n} para permitir ser opcional
     @classmethod
     def termo_regex_interroga(self, termo):
-        if termo.find('*')>=0 or termo.find('$')>=0:
-            # corrige * ou $ seguidos mas não coloca o .* ainda
+        if termo.find('*')>=0:
+            # corrige * seguido mas não coloca o .* ainda
             # para não atrapalhar o controle de números \d.\d
             termo = self.RE_TOKEN_ASTERISCO.sub('*', termo)
         termo = self.formatar_termo_numerico_pesquisa(termo)
