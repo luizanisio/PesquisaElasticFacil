@@ -2,7 +2,8 @@
 
 ### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (300 dimensões nesse exemplo):
 - o char_filter vai converter os símbolos `,` `.` `:` `/`  em `_` para facilitar a localização de números separados por símbolos diferentes no documento e na pesquisa.
-- o processamento do `PesquisaElasticFacil` vai fazer esse mesmo tratamento nos números informados nos critérios de pesquisa e substituir os símbolos por um regex `_?`, com isso a pesquisa vai encontrar números com a mesma estrutura com separadores diferentes. O processamento também inclui `_?` nos milhares caso o número não tenha separadores. Exemplo: `12345` vira `12_?345`.
+- o processamento do `PesquisaElasticFacil` vai fazer esse mesmo tratamento nos números informados nos critérios de pesquisa e substituir os símbolos por um regex `_?`, com isso a pesquisa vai encontrar números com a mesma estrutura com separadores diferentes. O processamento também inclui `_?` nos milhares caso o número não tenha separadores. 
+- Exemplos: `12345` vira `12_?345`, `12345,56` vira `12_?345_?56`.
 - O mapeamento do campo raw permite a pesquisa de termos literais sem transformação por dicionário de sinônimos - veja mais aqui [`synonym token filter`](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-tokenfilter.html). Grupos de termos entre aspas serão pesquisados no campo raw.
 ```json
 PUT ejuris
