@@ -33,7 +33,7 @@ PUT ejuris
 			"char_filter": {
 				"numeros": {
 					"type": "pattern_replace",
-					"pattern": "(\\d+)[\\.\\-\\/\\:](?=\\d)",
+					"pattern": "(\\d+)[\\.\\-\\/\\:,](?=\\d)",
 					"replacement": "$1_"
 				}
 			}
