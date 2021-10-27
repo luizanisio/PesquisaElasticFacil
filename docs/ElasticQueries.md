@@ -4,18 +4,19 @@
 - o char_filter vai converter os símbolos `,` `.` `:` `/`  em `_` para facilitar a localização de números separados por símbolos diferentes no documento e na pesquisa.
 - o processamento do `PesquisaElasticFacil` vai fazer esse mesmo tratamento nos números informados nos critérios de pesquisa e substituir os símbolos por um regex `_?`, com isso a pesquisa vai encontrar números com a mesma estrutura com separadores diferentes. O processamento também inclui `_?` nos milhares caso o número não tenha separadores. Exemplo: `12345` vira `12_?345`.
 ```json
-PUT explorasim
-{
-	"settings": {
+PUT ejuris
+{ 	"settings": {
 		"analysis": {
 			"analyzer": {
 				"simple_analyzer": {
 					"tokenizer": "uax_url_email",
 					"char_filter": ["numeros"],
-					"filter": [
-						"lowercase",
-						"asciifolding"
-					]
+					"filter": ["lowercase","asciifolding","sinonimos"]
+				},
+				"raw_analyzer": {
+					"tokenizer": "uax_url_email",
+					"char_filter": ["numeros"],
+					"filter": ["lowercase","asciifolding"]
 				},
 				"stemmed_analyzer": {
 					"tokenizer": "uax_url_email",
@@ -23,6 +24,11 @@ PUT explorasim
 					"filter": ["lowercase",	"asciifolding",	"keyword_repeat",	"brazilian_stem",	"remove_duplicates"	]
 				 }
 			},
+      "filter" : {"sinonimos": 
+                     {"type": "synonym","lenient": false, "expand" : true,
+                      "synonyms": [ "art, artig, artigos, artigo => art, artig, artigos, artigo"]
+      				}			
+  		},
 			"char_filter": {
 				"numeros": {
 					"type": "pattern_replace",
@@ -40,8 +46,9 @@ PUT explorasim
 			"grupo_sim": {"type": "integer"},
 			"vetor": {"type": "dense_vector","dims": 300},
 			"texto": {"type": "text","analyzer": "simple_analyzer","term_vector": "with_positions_offsets",
-				         "fields": {	"stemmed": {"type": "text","analyzer": "stemmed_analyzer","term_vector": "with_positions_offsets"}}
-			         },
+				         "fields": { "stemmed": {"type": "text","analyzer": "stemmed_analyzer","term_vector": "with_positions_offsets"},
+				                     "raw": {"type": "text","analyzer": "raw_analyzer","term_vector": "with_positions_offsets"}
+				         },
 			"dthr_vetor": {	"type": "date",	"format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"
 			}
 		}
