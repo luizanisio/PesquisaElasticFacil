@@ -57,7 +57,7 @@ Queries no Elastic que permitem a transformação dos operadores: [`ElasticQueri
    - `OU` antes do grupo: `(psicologia clínica) OU .tipo.(artigo ou revista) .data.(> 2021-01-01) OU .autor.(skinner)`
      - Esse exemplo pesquisa os documento do tipo artigo ou revista ou do autor Skinner, com data maior que "2021-01-01" e que contenham os termos "psicologia" e "clínica". Mesmo os grupos com `OU` estando separados, eles são analisados em conjunto, precisando que pelo menos um dos critérios `OU` seja atendido.
  - Não é permitido colocar critérios de campos dentro de parênteses: `psicologia ADJ5 clínica ( .autor.(skinner) e .tipo.(artigo) )`, pode-se escrever assim: `psicologia ADJ5 clínica  .autor.(skinner) e .tipo.(artigo) `
- > 💡 <sub>Nota: Internamente cada grupo será tratado como uma `PesquisaElasticFacil` com todas as suas regras, a diferença é a aplicação em campos diferentes para cada conjunto de critério, bemn como a possibilidade de usar os intervalos entre datas ou números.</sub>
+ > 💡 <sub>Nota: Internamente cada grupo será tratado como uma `PesquisaElasticFacil` com todas as suas regras, a diferença é a aplicação em campos diferentes para cada conjunto de critério, bem como a possibilidade de usar os intervalos entre datas ou números.</sub>
 
 ### Dessa forma, serão criados grupos de termos por operadores como nos exemplos:
  - `termo1 prox10 termo2 adj3 termo3` ==> `(termo1 PROX10 termo2) E (termo2 ADJ3 termo3)` ==> dois grupos foram criados
