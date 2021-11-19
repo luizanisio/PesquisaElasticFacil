@@ -7,7 +7,7 @@
 - Exemplos: `12345` vira `12_?345`, `12345,56` vira `12_?345_?56`.
 - O mapeamento do campo raw permite a pesquisa de termos literais sem transformação por dicionário de sinônimos - veja mais aqui [`synonym token filter`](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-tokenfilter.html). Grupos de termos entre aspas serão pesquisados no campo raw.
 ```json
-PUT ejuris
+PUT explorasim
 { 	"settings": {
 		"analysis": {
 			"analyzer": {
