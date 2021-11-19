@@ -1,4 +1,5 @@
  Algumas queries de exemplo para pesquisas textuais e vetoriais. Essas estruturas são criadas automaticamente pela classe `PesquisaElasticFacil` como descrito no arquivo `README`.
+ - Documentação oficial sobre pesquisa vetorial do [`ElasticSearch`](https://www.elastic.co/pt/blog/text-similarity-search-with-vectors-in-elasticsearch)
 
 ### Exemplo de criação de um índice para permitir pesquisa textual e vetorial (300 dimensões nesse exemplo):
 - o char_filter vai converter os símbolos `,` `.` `:` `/`  em `_` para facilitar a localização de números separados por símbolos diferentes no documento e na pesquisa.
